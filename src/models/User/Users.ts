@@ -8,12 +8,14 @@ import FirebaseCollectionModel, {
 } from "../base/CollectionModel.js";
 import {
   formatDbSnap,
+  isFirestoreError,
   parseSchema,
   zEnforceNonEmptyStr,
 } from "../../utils/utils.js";
 import {
   AuthenticationError,
   BadRequestError,
+  ConflictError,
   DocumentNotFoundError,
   ForbiddenError,
   InternalServerError,
@@ -48,7 +50,7 @@ export class UserModel<
 > extends FirebaseCollectionModel<T, "users"> {
   private usernameLookup = new FirebaseLookupModel(
     connectDB(),
-    "email",
+    "username",
     userLookupSchema,
   );
   private emailLookup = new FirebaseLookupModel(
@@ -122,15 +124,14 @@ export class UserModel<
 
     try {
       return await this.db.runTransaction(async (tx) => {
-        const userRef = this.ref();
+        const newUser = this.txAdd(tx, parsed);
         const lookup = {
-          userId: userRef.id,
+          userId: newUser.id,
         };
 
+        console.log(lookup);
         this.usernameLookup.txCreateNewDoc(tx, parsed.username, lookup);
         this.emailLookup.txCreateNewDoc(tx, parsed.email, lookup);
-
-        const newUser = this.txAdd(tx, parsed);
 
         return {
           username,
@@ -306,6 +307,30 @@ export class UserModel<
     const snap = await this.ref().orderBy("createdAt", "asc").get();
 
     return snap.docs.map((d) => this.format(d));
+  }
+
+  protected override handleFirestoreError(e: unknown): never {
+    if (!isFirestoreError(e)) {
+      console.log(e);
+      throw e;
+    }
+
+    switch (e.code) {
+      case 6:
+      case "already-exists":
+        const conflict = e.details?.includes(`documents/username/`)
+          ? "Username taken"
+          : "Email already in use";
+
+        throw new ConflictError(conflict);
+
+      case 5:
+      case "not-found":
+        throw new DocumentNotFoundError(`$Document not found`);
+
+      default:
+        throw e;
+    }
   }
 }
 

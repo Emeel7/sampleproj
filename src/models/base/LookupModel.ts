@@ -66,6 +66,7 @@ export default class FirebaseLookupModel<
     docName: string,
     data: Parsed<T, B>,
   ) {
+    console.log(docName, data);
     return tx.create(this.getDocRef(docName), {
       ...data,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
