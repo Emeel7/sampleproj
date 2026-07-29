@@ -1,0 +1,42 @@
+{
+  "name": "backend",
+  "version": "2.0.0",
+  "description": "Notes Application backend",
+  "main": "dist/server.js",
+  "scripts": {
+    "test": "jest",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "date-fns": "^4.1.0",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "express-async-handler": "^1.2.0",
+    "firebase-admin": "^13.6.0",
+    "lodash": "^4.18.1",
+    "tsx": "^4.21.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
+    "@types/lodash": "^4.17.24",
+    "@types/node": "^25.5.0",
+    "jest": "^30.3.0",
+    "nodemon": "^3.1.11",
+    "ts-jest": "^29.4.6",
+    "typescript": "^5.9.3"
+  }
+}
