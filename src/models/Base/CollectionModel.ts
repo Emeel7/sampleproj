@@ -10,15 +10,12 @@ import { stripUndefinedFields } from "../../utils/generalUtils.js";
 
 // Useful Types
 import {
-  type AtLeastOne,
   type DbDocData,
   type DocSnapType,
-  type Infer,
   type Parsed,
   type ParsedPartial,
 } from "./base.types.js";
 import {
-  formatDbSnap,
   isFirestoreError,
   parseObjectPartial,
   parseSchema,
@@ -30,14 +27,14 @@ export type findAllQueryConfig = {
 };
 
 export default class FirebaseCollectionModel<
-  ZodSchema extends z.ZodObject,
-  Brand extends string,
-  DbObject extends Partial<Infer<ZodSchema>> = DbDocData<ZodSchema>,
+  CollectionName extends string,
+  Schema extends z.ZodObject,
+  Outputs extends Partial<DbDocData<Schema>>[] = [DbDocData<Schema>],
 > {
   constructor(
     public db: admin.firestore.Firestore,
-    public collection: Brand,
-    public schema: ZodSchema,
+    public collection: CollectionName,
+    public schema: Schema,
   ) {
     if (!collection || collection.trim() === "") {
       throw new Error("Invalid collection name");
@@ -49,8 +46,11 @@ export default class FirebaseCollectionModel<
     return this.db.collection(this.collection);
   }
 
-  protected format(d: DocSnapType): DbObject {
-    return formatDbSnap(d);
+  protected format(d: DocSnapType): Outputs[number] {
+    return {
+      id: d.id,
+      ...d.data(),
+    } as DbDocData<Schema>;
   }
 
   protected handleFirestoreError(e: unknown): never {
@@ -91,7 +91,7 @@ export default class FirebaseCollectionModel<
   }
 
   /* Sensitive methods interacting directly with database with WRITE access */
-  protected async addItem(data: Parsed<ZodSchema, Brand>) {
+  protected async addItem(data: Parsed<Schema, CollectionName>) {
     return await this.ref().add({
       ...data,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -101,7 +101,7 @@ export default class FirebaseCollectionModel<
 
   protected async updateItem(
     doc: DocSnapType,
-    data: ParsedPartial<ZodSchema, Brand>,
+    data: ParsedPartial<Schema, CollectionName>,
   ) {
     // console.log(data)
     return await doc.ref.update({
@@ -113,7 +113,7 @@ export default class FirebaseCollectionModel<
   // Transaction Methods
   protected txAdd(
     tx: admin.firestore.Transaction,
-    data: Parsed<ZodSchema, Brand>,
+    data: Parsed<Schema, CollectionName>,
   ) {
     const docRef = this.ref().doc();
 
@@ -129,7 +129,7 @@ export default class FirebaseCollectionModel<
   protected txUpdate(
     tx: admin.firestore.Transaction,
     doc: DocSnapType,
-    data: ParsedPartial<ZodSchema, Brand>,
+    data: ParsedPartial<Schema, CollectionName>,
   ) {
     return tx.update(doc.ref, {
       ...data,
@@ -182,7 +182,10 @@ export default class FirebaseCollectionModel<
       throw new BadRequestError("No fields to update");
     }
 
-    await this.updateItem(doc, stripped as ParsedPartial<ZodSchema, Brand>); // Interesting
+    await this.updateItem(
+      doc,
+      stripped as ParsedPartial<Schema, CollectionName>,
+    ); // Interesting
     return this.findById(id);
   }
 

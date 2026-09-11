@@ -12,11 +12,13 @@ import {
   parseNewUserDetails,
   parseUserId,
 } from "./parsers/userRequestParsers.js";
+import { getUserIdentity } from "./parsers/noteRequestParsers.js";
+import { ForbiddenError } from "../models/errors/Errors.js";
 
 // Util
-const shortCookieArgs = (
+export const shortCookieArgs = (
   sT: string,
-  minutes: number = 15,
+  minutes: number = 5,
 ): [string, string, CookieOptions] => {
   return [
     USER_SESSION_COOKIE_NAME!,
@@ -39,10 +41,10 @@ const shortCookieArgs = (
 export const registerNewUser = async (req: Request, res: Response) => {
   const newUserDetails = parseNewUserDetails(req.body);
 
-  const newUser = await dbCreateNewUser(newUserDetails);
+  const { sessionToken, ...newUser } = await dbCreateNewUser(newUserDetails);
 
   return res
-    .cookie(...shortCookieArgs(newUser.sessionToken))
+    .cookie(...shortCookieArgs(sessionToken))
     .status(201)
     .json(newUser);
 };
@@ -65,9 +67,9 @@ export const loginUser = async (req: Request, res: Response) => {
 // @route POST /auth/refresh
 // @access Private
 export const refreshSessionToken = async (req: Request, res: Response) => {
-  const userId = parseUserId(req.body);
-
-  const { sessionToken } = await dbUpdateUserSessionToken(userId);
+  if (!req.identity) throw new ForbiddenError();
+  
+  const { sessionToken } = await dbUpdateUserSessionToken(req.identity.);
 
   return res.cookie(...shortCookieArgs(sessionToken)).sendStatus(204);
 };

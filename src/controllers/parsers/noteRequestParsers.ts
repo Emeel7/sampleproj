@@ -4,12 +4,12 @@ import {
   ForbiddenError,
   ValidationError,
 } from "../../models/errors/Errors.js";
-import { type findAllQueryConfig } from "../../models/base/CollectionModel.js";
+import { type findAllQueryConfig } from "../../models/Base/CollectionModel.js";
 import z from "zod";
 import {
   throwNonObjects,
   stripUndefinedFields,
-  parseId,
+  parseString,
 } from "../../utils/generalUtils.js";
 import type { NoteType } from "../../models/Note/note.types.js";
 import { noteSchema } from "../../models/Note/NoteSchemas.js";
@@ -21,7 +21,7 @@ export const findAllQueryParams = z.object({
 });
 
 export const parseNoteId = (body: string | string[] | undefined) => {
-  return parseId(body, "note");
+  return parseString(body, "note");
 };
 
 export const parseNoteData = (body: Request["body"]): NoteType | never => {

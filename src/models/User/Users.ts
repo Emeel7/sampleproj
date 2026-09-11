@@ -1,13 +1,9 @@
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { connectDB } from "../../resources/database.js";
-import FirebaseLookupModel from "../base/LookupModel.js";
-import FirebaseCollectionModel from "../base/CollectionModel.js";
-import {
-  formatDbSnap,
-  isFirestoreError,
-  parseSchema,
-} from "../../utils/utils.js";
+import FirebaseLookupModel from "../Base/LookupModel.js";
+import FirebaseCollectionModel from "../Base/CollectionModel.js";
+import { isFirestoreError, parseSchema } from "../../utils/utils.js";
 import {
   AuthenticationError,
   ConflictError,
@@ -20,7 +16,7 @@ import type {
   DocSnapType,
   FirebaseQueryType,
   ParsedPartial,
-} from "../base/base.types.js";
+} from "../Base/base.types.js";
 import type {
   UserType,
   UserFieldTypes,
@@ -29,6 +25,8 @@ import type {
   NewUserDetails,
   UserLoginFieldTypes,
   UserSchemaType,
+  DefaultUserOutputType,
+  FullUserOutputType,
 } from "./users.types.js";
 import {
   userSchema,
@@ -36,9 +34,11 @@ import {
   userLookupSchema,
 } from "./UserSchemas.js";
 
-export class UserModel<
-  T extends UserSchemaType,
-> extends FirebaseCollectionModel<T, "users", Omit<DbDocData<T>, "auth">> {
+export class UserModel extends FirebaseCollectionModel<
+  "users",
+  UserSchemaType,
+  [DefaultUserOutputType, FullUserOutputType]
+> {
   private usernameLookup = new FirebaseLookupModel(
     connectDB(),
     "username",
@@ -50,20 +50,26 @@ export class UserModel<
     userLookupSchema,
   );
 
-  constructor(schema: T) {
-    super(connectDB(), "users", schema);
+  constructor() {
+    super(connectDB(), "users", userSchema);
   }
 
   // Helpful
-  protected override format(d: DocSnapType): DbDocType<T, "auth">;
+  protected override format(d: DocSnapType): DefaultUserOutputType;
   protected override format(
     d: DocSnapType,
     opts: { keepAuth: true },
-  ): DbDocType<T>;
+  ): FullUserOutputType;
   protected override format(d: DocSnapType, opts?: { keepAuth: true }) {
-    const userDoc = opts?.keepAuth
-      ? formatDbSnap(d, { omit: ["auth"] as const })
-      : super.format(d);
+    const userDoc = {
+      id: d.id,
+      ...d.data(),
+    } as FullUserOutputType;
+
+    if (!opts?.keepAuth) {
+      const { auth, ...userWithoutAuth } = userDoc;
+      return userWithoutAuth;
+    }
 
     return userDoc;
   }
@@ -86,10 +92,13 @@ export class UserModel<
     return snap;
   }
 
-  protected authenticateUser(userDoc: DocSnapType, attemptPass: string) {
+  protected async authenticateUser(userDoc: DocSnapType, attemptPass: string) {
     const userData = this.format(userDoc, { keepAuth: true });
 
-    const match = this.comparePassword(attemptPass, userData.auth.password);
+    const match = await this.comparePassword(
+      attemptPass,
+      userData.auth.password,
+    );
 
     if (!match) throw new AuthenticationError("Invalid Credentials");
 
@@ -139,16 +148,21 @@ export class UserModel<
   async getUserByField<TField extends keyof UserQueriableFieldTypes>(
     field: TField,
     value: UserQueriableFieldTypes[TField],
-  ): Promise<DbDocType<T, "auth">>;
+  ): Promise<DefaultUserOutputType>;
   async getUserByField<TField extends keyof UserQueriableFieldTypes>(
     field: TField,
     value: UserQueriableFieldTypes[TField],
-    opts: { keepAuth: true },
-  ): Promise<DbDocType<T>>;
+    opts: { keepAuth?: true },
+  ): Promise<FullUserOutputType>;
   async getUserByField<TField extends keyof UserQueriableFieldTypes>(
     field: TField,
     value: UserQueriableFieldTypes[TField],
-    opts?: { keepAuth: true },
+    opts: { dbDoc?: true },
+  ): Promise<DocSnapType>;
+  async getUserByField<TField extends keyof UserQueriableFieldTypes>(
+    field: TField,
+    value: UserQueriableFieldTypes[TField],
+    opts?: { keepAuth?: true; dbDoc?: true },
   ) {
     const snap = await this.findUser(this.ref().where(field, "==", value));
 
@@ -159,9 +173,18 @@ export class UserModel<
       throw new DocumentNotFoundError("User Not Found");
     }
 
-    const userDoc = snap.docs[0]!;
+    if (opts?.dbDoc) {
+      return snap.docs[0]! as DocSnapType; // Problematic?
+    }
 
-    return opts ? this.format(userDoc, opts) : this.format(userDoc);
+    const userDoc = snap.docs[0]!;
+    const checking = userDoc.data();
+
+    if (opts?.keepAuth) {
+      return this.format(userDoc, { keepAuth: true });
+    }
+
+    return this.format(userDoc);
   }
 
   async updateUserField<T extends keyof UserUpdatableFieldTypes>(
@@ -217,10 +240,10 @@ export class UserModel<
 
     this.updateItem(userDoc, {
       auth: {
-        password: this.hashPassword(newPass),
+        password: await this.hashPassword(newPass),
         sessionToken: newSessionToken,
       },
-    } as ParsedPartial<T, "users">);
+    } as ParsedPartial<UserSchemaType, "users">);
 
     return { sessionToken: newSessionToken };
   }
@@ -235,13 +258,23 @@ export class UserModel<
         ...userData.auth,
         sessionToken,
       },
-    } as ParsedPartial<T, "users">);
+    } as ParsedPartial<UserSchemaType, "users">);
 
     return { sessionToken };
   }
 
   async updateUserSessionTokenWithId(userId: string) {
     const userDoc = await this.getDocOrThrow(userId);
+
+    return await this.updateUserSessionToken(userDoc);
+  }
+
+  async updateUserSessionTokenWithSessionToken(sessionToken: string) {
+    const userDoc = await this.getUserByField(
+      "auth.sessionToken",
+      sessionToken,
+      { dbDoc: true },
+    );
 
     return await this.updateUserSessionToken(userDoc);
   }
@@ -261,7 +294,7 @@ export class UserModel<
     const userDoc = snap.docs[0]!;
 
     // Authenticate user
-    this.authenticateUser(userDoc, password);
+    await this.authenticateUser(userDoc, password);
 
     // Update session token
     return await this.updateUserSessionToken(userDoc);
@@ -325,7 +358,7 @@ export class UserModel<
   }
 }
 
-export const User = new UserModel<UserSchemaType>(userSchema);
+export const User = new UserModel();
 
 // CREATE
 export const dbCreateNewUser = async (conf: NewUserDetails) =>
@@ -351,8 +384,8 @@ export const dbUpdateUserByField = async <
   userId: string,
 ) => await User.updateUserField(userId, by, val);
 
-export const dbUpdateUserSessionToken = async (userId: string) =>
-  await User.updateUserSessionTokenWithId(userId);
+export const dbUpdateUserSessionToken = async (sessionToken: string) =>
+  await User.updateUserSessionTokenWithSessionToken(sessionToken);
 
 export const dbUpdateUserPassword = async (
   userId: string,

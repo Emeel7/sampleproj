@@ -14,6 +14,7 @@ import {
   parseUserUpdateAttempt,
 } from "./parsers/userRequestParsers.js";
 
+import { shortCookieArgs } from "./authController.js";
 // // -------- ROUTES
 
 // @desc Get all users
@@ -60,7 +61,7 @@ export const updateUserPassword = async (req: Request, res: Response) => {
 
   const { sessionToken } = await dbUpdateUserPassword(id, oldPass, newPass);
 
-  return res.status(200).json({ sessionToken });
+  return res.cookie(...shortCookieArgs(sessionToken)).sendStatus(204);
 };
 
 // @desc Delete user

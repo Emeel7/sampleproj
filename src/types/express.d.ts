@@ -1,9 +1,9 @@
-import { Brand } from "../models/base/base.types.ts";
+import type { FullUserOutputType } from "../models/User/users.types.js";
 
 declare global {
   namespace Express {
     interface Request {
-      identity?: string;
+      identity?: FullUserOutputType;
     }
   }
 }

@@ -1,61 +1,75 @@
-import z from 'zod'
-import { type Request } from 'express'
-import { newUserDetailsSchema, loginAttemptSchema, EmailSchema, userUpdateAttemptSchema, PasswordSchema, passwordUpdateAttemptSchema } from '../../models/User/UserSchemas.js'
-import { type NewUserDetails, } from '../../models/User/users.types.js'
-import { parseSchema } from '../../utils/utils.js'
-import { ValidationError } from '../../models/errors/Errors.js'
-import { parseId } from '../../utils/generalUtils.js'
+import z from "zod";
+import { type Request } from "express";
+import {
+  newUserDetailsSchema,
+  loginAttemptSchema,
+  EmailSchema,
+  userUpdateAttemptSchema,
+  PasswordSchema,
+  passwordUpdateAttemptSchema,
+} from "../../models/User/UserSchemas.js";
+import { type NewUserDetails } from "../../models/User/users.types.js";
+import { parseSchema } from "../../utils/utils.js";
+import { ValidationError } from "../../models/errors/Errors.js";
+import { parseString } from "../../utils/generalUtils.js";
 
-const determineMethod = (val: string): 'email' | 'username' => {
-    try {
-        parseSchema(EmailSchema, val, 'email')
-        return 'email'
-    } catch (e) {
-        if (!(e instanceof ValidationError)) throw e
-        return 'username'
-    }
-}
+const determineLoginMethod = (val: string): "email" | "username" => {
+  try {
+    parseSchema(EmailSchema, val, "email");
+    return "email";
+  } catch (e) {
+    if (!(e instanceof ValidationError)) throw e;
+    return "username";
+  }
+};
 
 export const parseUserId = (body: string | string[] | undefined) => {
-    return parseId(body, 'user')
-}
+  return parseString(body, "user");
+};
 
-export const parseNewUserDetails = (body: Request['body']) => {
-    const result = parseSchema(newUserDetailsSchema, body, 'new-user')
+export const parseNewUserDetails = (body: Request["body"]) => {
+  const result = parseSchema(newUserDetailsSchema, body, "new-user");
 
-    return result.data
-}
+  return result.data;
+};
 
-export const parseUserUpdateAttempt = (body: Request['body']) => {
-    const result = parseSchema(userUpdateAttemptSchema, body, 'update-attempt')
+export const parseUserUpdateAttempt = (body: Request["body"]) => {
+  const result = parseSchema(userUpdateAttemptSchema, body, "update-attempt");
 
-    const method: 'email' | 'username' = 'email' in result.data
-        ? 'email'
-        : 'username'
+  const method: "email" | "username" =
+    "email" in result.data ? "email" : "username";
 
-    const data = 'email' in result.data
-        ? result.data.email
-        : result.data.username
+  const data =
+    "email" in result.data ? result.data.email : result.data.username;
 
-    return {
-        method,
-        data
-    }
-}
+  return {
+    method,
+    data,
+  };
+};
 
-export const parseLoginAttempt = (body: Request['body']) => {
-    const result = parseSchema(loginAttemptSchema, body, 'login-attempt')
+export const parseLoginAttempt = (body: Request["body"]) => {
+  const result = parseSchema(loginAttemptSchema, body, "login-attempt", {
+    failureMessage: "Invalid login attempt data",
+  });
 
-    let method = determineMethod(result.data.identifier)
+  let method = determineLoginMethod(result.data.identifier);
 
-    return {
-        method,
-        data: result.data
-    }
-}
+  return {
+    method,
+    data: result.data,
+  };
+};
 
-export const parseUserResetAttempt = (body: Request['body']) => {
-    const result = parseSchema(passwordUpdateAttemptSchema, body, 'user-password')
+export const parseUserResetAttempt = (body: Request["body"]) => {
+  const result = parseSchema(
+    passwordUpdateAttemptSchema,
+    body,
+    "user-password",
+    {
+      failureMessage: "Invalid password reset attempt data",
+    },
+  );
 
-    return result.data
-}
+  return result.data;
+};

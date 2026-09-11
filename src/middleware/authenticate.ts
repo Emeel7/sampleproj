@@ -13,16 +13,17 @@ const authenticate = async (
   res: Response,
   next: NextFunction,
 ) => {
-  const sessionToken = req.cookies[cookieNames.user_cookie_name];
+  const sessionToken = req.cookies?.[cookieNames.user_cookie_name];
 
   if (!sessionToken) throw new ForbiddenError();
 
   const existingUser = await dbGetUserByField(
     "auth.sessionToken",
     sessionToken,
+    { keepAuth: true },
   );
 
-  req.identity = existingUser.id;
+  req.identity = existingUser;
 
   return next();
 };

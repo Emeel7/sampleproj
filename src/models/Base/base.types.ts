@@ -28,6 +28,11 @@ export type DocRefType = admin.firestore.DocumentReference<
   admin.firestore.DocumentData
 >;
 
+export type DocQueryType = FirebaseFirestore.QueryDocumentSnapshot<
+  FirebaseFirestore.DocumentData,
+  FirebaseFirestore.DocumentData
+>[];
+
 export type Brand<K, T extends string> = K & {
   readonly __brand: T;
 };

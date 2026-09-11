@@ -1,11 +1,12 @@
-import FirebaseCollectionModel from "../base/CollectionModel.js";
+import FirebaseCollectionModel from "../Base/CollectionModel.js";
 import { connectDB } from "../../resources/database.js";
 
-export class NoteModel<
-  T extends NoteSchemaType,
-> extends FirebaseCollectionModel<T, "note"> {
-  constructor(schema: T) {
-    super(connectDB(), "note", schema);
+export class NoteModel extends FirebaseCollectionModel<
+  "notes",
+  NoteSchemaType
+> {
+  constructor() {
+    super(connectDB(), "notes", noteSchema);
   }
 
   async findAllFromUser(qry: findAllQueryConfig, userId: string) {
@@ -24,16 +25,21 @@ export class NoteModel<
     const snap = await query.get();
     return snap.docs.map((d) => this.format(d));
   }
+
+  override async findAll(qry: findAllQueryConfig): Promise<never> {
+    throw new ForbiddenError();
+  }
 }
 
-export const Note = new NoteModel<NoteSchemaType>(noteSchema);
+export const Note = new NoteModel();
 
 /**
  * Helper functions for database operations.
  */
-import { type findAllQueryConfig } from "../base/CollectionModel.js";
+import { type findAllQueryConfig } from "../Base/CollectionModel.js";
 import type { NoteSchemaType, NoteType } from "./note.types.js";
 import { noteSchema } from "./NoteSchemas.js";
+import { ForbiddenError } from "../errors/Errors.js";
 
 // Retrieve all notes with optional query config
 export const dbGetAllNotesFromUser = async (

@@ -6,6 +6,7 @@ const PORT = process.env.PORT || 5000;
 // // ---- IMPORTS
 import express, { type Request, type Response } from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import corsOptions from "./config/corsOptions.js";
 
 // // ---- APP
@@ -18,14 +19,15 @@ import authenticate from "./middleware/authenticate.js";
 
 app.use(logger);
 app.use(cors(corsOptions));
+app.use(cookieParser());
 app.use(express.json());
 app.use(connectDB);
-app.use(authenticate);
 
 // // ---- ROUTES
 import authRoutes from "./routes/authRoutes.js";
 import notesRoutes from "./routes/notesRoutes.js";
 app.use("/auth", authRoutes);
+app.use(authenticate);
 app.use("/notes", notesRoutes);
 
 // // ---- ERROR HANDLING
