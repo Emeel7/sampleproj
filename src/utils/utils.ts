@@ -1,7 +1,6 @@
 import z from "zod";
 import type {
   DbDocData,
-  DbDocType,
   DocSnapType,
   Infer,
   Parsed,
@@ -57,7 +56,7 @@ export function parseObjectPartial<T extends z.ZodObject, B extends string>(
 
 export function formatDbSnap<
   T extends z.ZodObject,
-  const K extends readonly (keyof Infer<T>)[],
+  const K extends readonly (keyof Infer<T>)[] = [],
 >(
   d: DocSnapType,
   opts?: {

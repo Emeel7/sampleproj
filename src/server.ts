@@ -14,11 +14,13 @@ const app = express();
 // // ---- MIDDLEWARE
 import { logger } from "./middleware/EventLogger.js";
 import connectDB from "./middleware/dbConn.js";
+import authenticate from "./middleware/authenticate.js";
 
-app.use(express.json());
 app.use(logger);
 app.use(cors(corsOptions));
+app.use(express.json());
 app.use(connectDB);
+app.use(authenticate);
 
 // // ---- ROUTES
 import authRoutes from "./routes/authRoutes.js";

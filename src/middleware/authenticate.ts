@@ -1,20 +1,30 @@
-import express, { type Request, type Response, type NextFunction } from 'express'
+import express, {
+  type Request,
+  type Response,
+  type NextFunction,
+} from "express";
 
-import { dbGetUserByField } from '../models/User/Users.js'
-import { ForbiddenError } from '../models/errors/Errors.js'
-import { merge } from 'lodash'
-import cookieNames from '../config/cookies.js'
+import { dbGetUserByField } from "../models/User/Users.js";
+import { ForbiddenError } from "../models/errors/Errors.js";
+import cookieNames from "../config/cookies.js";
 
-const authenticate = async (req: Request, res: Response, next: NextFunction) => {
-    const sessionToken = req.cookies[cookieNames.user_cookie_name]
+const authenticate = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  const sessionToken = req.cookies[cookieNames.user_cookie_name];
 
-    if (!sessionToken) throw new ForbiddenError()
+  if (!sessionToken) throw new ForbiddenError();
 
-    const existingUser = await dbGetUserByField('auth.sessionToken', sessionToken)
+  const existingUser = await dbGetUserByField(
+    "auth.sessionToken",
+    sessionToken,
+  );
 
-    merge(req, { identity: existingUser })
+  req.identity = existingUser.id;
 
-    return next()
-}
+  return next();
+};
 
-export default authenticate
+export default authenticate;

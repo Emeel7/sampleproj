@@ -1,20 +1,15 @@
 import bcrypt from "bcrypt";
 import crypto from "crypto";
-import { z } from "zod";
 import { connectDB } from "../../resources/database.js";
 import FirebaseLookupModel from "../base/LookupModel.js";
-import FirebaseCollectionModel, {
-  type findAllQueryConfig,
-} from "../base/CollectionModel.js";
+import FirebaseCollectionModel from "../base/CollectionModel.js";
 import {
   formatDbSnap,
   isFirestoreError,
   parseSchema,
-  zEnforceNonEmptyStr,
 } from "../../utils/utils.js";
 import {
   AuthenticationError,
-  BadRequestError,
   ConflictError,
   DocumentNotFoundError,
   ForbiddenError,
@@ -22,12 +17,9 @@ import {
 } from "../errors/Errors.js";
 import type {
   DbDocData,
-  DbDocType,
   DocSnapType,
   FirebaseQueryType,
-  Infer,
   ParsedPartial,
-  RemoveKeys,
 } from "../base/base.types.js";
 import type {
   UserType,
@@ -41,13 +33,12 @@ import type {
 import {
   userSchema,
   userFieldSchemas,
-  EmailSchema,
   userLookupSchema,
 } from "./UserSchemas.js";
 
 export class UserModel<
   T extends UserSchemaType,
-> extends FirebaseCollectionModel<T, "users"> {
+> extends FirebaseCollectionModel<T, "users", Omit<DbDocData<T>, "auth">> {
   private usernameLookup = new FirebaseLookupModel(
     connectDB(),
     "username",
