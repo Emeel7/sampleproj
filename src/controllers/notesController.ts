@@ -24,7 +24,7 @@ import {
 export const getAllNotesFromUser = async (req: Request, res: Response) => {
   const qry = parseQuery(req.query);
 
-  const userId = getUserIdentity(req);
+  const { id: userId } = getUserIdentity(req);
 
   const notes = await dbGetAllNotesFromUser(qry, userId);
 
@@ -35,7 +35,9 @@ export const getAllNotesFromUser = async (req: Request, res: Response) => {
 // @route POST /
 // @access Private
 export const addNote = async (req: Request, res: Response) => {
-  const { title, content, userId } = parseNoteData(req.body);
+  const { id: userId } = getUserIdentity(req);
+
+  const { title, content } = parseNoteData(req.body);
 
   const newNote = await dbCreateAndStoreNote({ title, content, userId });
 
@@ -65,7 +67,7 @@ export const updateNote = async (req: Request, res: Response) => {
   return res.status(200).json(updatedNote);
 };
 
-// @desc Delete Update specified note
+// @desc Delete specified note
 // @route DELETE /:id
 // @access Private
 export const deleteNote = async (req: Request, res: Response) => {

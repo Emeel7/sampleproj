@@ -4,7 +4,7 @@ import express, {
   type NextFunction,
 } from "express";
 
-import { dbGetUserByField } from "../models/User/Users.js";
+import { dbGetUserByField, dbGetUserIdentity } from "../models/User/Users.js";
 import { ForbiddenError } from "../models/errors/Errors.js";
 import cookieNames from "../config/cookies.js";
 
@@ -17,10 +17,9 @@ const authenticate = async (
 
   if (!sessionToken) throw new ForbiddenError();
 
-  const existingUser = await dbGetUserByField(
+  const existingUser = await dbGetUserIdentity(
     "auth.sessionToken",
     sessionToken,
-    { keepAuth: true },
   );
 
   req.identity = existingUser;

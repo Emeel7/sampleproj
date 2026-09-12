@@ -18,7 +18,7 @@ import type {
   ParsedPartial,
 } from "../Base/base.types.js";
 import type {
-  UserType,
+  UserInputType,
   UserFieldTypes,
   UserQueriableFieldTypes,
   UserUpdatableFieldTypes,
@@ -27,6 +27,8 @@ import type {
   UserSchemaType,
   DefaultUserOutputType,
   FullUserOutputType,
+  IdentifiedUserType,
+  UserIdentifiableFieldTypes,
 } from "./users.types.js";
 import {
   userSchema,
@@ -37,7 +39,7 @@ import {
 export class UserModel extends FirebaseCollectionModel<
   "users",
   UserSchemaType,
-  [DefaultUserOutputType, FullUserOutputType]
+  [DefaultUserOutputType, FullUserOutputType, IdentifiedUserType]
 > {
   private usernameLookup = new FirebaseLookupModel(
     connectDB(),
@@ -58,20 +60,37 @@ export class UserModel extends FirebaseCollectionModel<
   protected override format(d: DocSnapType): DefaultUserOutputType;
   protected override format(
     d: DocSnapType,
-    opts: { keepAuth: true },
+    opts: { fullUser: true },
   ): FullUserOutputType;
-  protected override format(d: DocSnapType, opts?: { keepAuth: true }) {
+  protected override format(
+    d: DocSnapType,
+    opts: { fullIdentity: true },
+  ): IdentifiedUserType;
+  protected override format(
+    d: DocSnapType,
+    opts?: { fullUser: true } | { fullIdentity: true },
+  ) {
     const userDoc = {
       id: d.id,
       ...d.data(),
     } as FullUserOutputType;
 
-    if (!opts?.keepAuth) {
+    if (!opts) {
       const { auth, ...userWithoutAuth } = userDoc;
       return userWithoutAuth;
     }
 
-    return userDoc;
+    if ("fullUser" in opts) return userDoc;
+
+    if ("fullIdentity" in opts) {
+      const { auth, createdAt, updatedAt, ...normalUser } = userDoc;
+      return {
+        ...normalUser,
+        sessionToken: auth.sessionToken,
+      };
+    }
+
+    throw new InternalServerError("Invalid options for format");
   }
 
   protected async hashPassword(password: string): Promise<string> {
@@ -86,14 +105,14 @@ export class UserModel extends FirebaseCollectionModel<
     return crypto.randomBytes(32).toString("base64url");
   }
 
-  protected async findUser(query: FirebaseQueryType) {
+  protected async findUserByQuery(query: FirebaseQueryType) {
     const snap = await query.limit(1).get();
 
     return snap;
   }
 
   protected async authenticateUser(userDoc: DocSnapType, attemptPass: string) {
-    const userData = this.format(userDoc, { keepAuth: true });
+    const userData = this.format(userDoc, { fullUser: true });
 
     const match = await this.comparePassword(
       attemptPass,
@@ -152,19 +171,26 @@ export class UserModel extends FirebaseCollectionModel<
   async getUserByField<TField extends keyof UserQueriableFieldTypes>(
     field: TField,
     value: UserQueriableFieldTypes[TField],
-    opts: { keepAuth?: true },
+    opts: { fullUser: true },
   ): Promise<FullUserOutputType>;
   async getUserByField<TField extends keyof UserQueriableFieldTypes>(
     field: TField,
     value: UserQueriableFieldTypes[TField],
-    opts: { dbDoc?: true },
+    opts: { dbDoc: true },
   ): Promise<DocSnapType>;
   async getUserByField<TField extends keyof UserQueriableFieldTypes>(
     field: TField,
     value: UserQueriableFieldTypes[TField],
-    opts?: { keepAuth?: true; dbDoc?: true },
+    opts: { fullIdentity: true },
+  ): Promise<IdentifiedUserType>;
+  async getUserByField<TField extends keyof UserQueriableFieldTypes>(
+    field: TField,
+    value: UserQueriableFieldTypes[TField],
+    opts?: { fullUser: true } | { dbDoc: true } | { fullIdentity: true },
   ) {
-    const snap = await this.findUser(this.ref().where(field, "==", value));
+    const snap = await this.findUserByQuery(
+      this.ref().where(field, "==", value),
+    );
 
     if (snap.empty) {
       if (field === "auth.sessionToken") {
@@ -173,15 +199,20 @@ export class UserModel extends FirebaseCollectionModel<
       throw new DocumentNotFoundError("User Not Found");
     }
 
-    if (opts?.dbDoc) {
+    const userDoc = snap.docs[0]!;
+
+    if (!opts) return this.format(userDoc);
+
+    if ("dbDoc" in opts) {
       return snap.docs[0]! as DocSnapType; // Problematic?
     }
 
-    const userDoc = snap.docs[0]!;
-    const checking = userDoc.data();
+    if ("fullIdentity" in opts) {
+      return this.format(userDoc, { fullIdentity: true });
+    }
 
-    if (opts?.keepAuth) {
-      return this.format(userDoc, { keepAuth: true });
+    if ("fullUser" in opts) {
+      return this.format(userDoc, { fullUser: true });
     }
 
     return this.format(userDoc);
@@ -199,7 +230,7 @@ export class UserModel extends FirebaseCollectionModel<
 
     try {
       await this.db.runTransaction(async (tx) => {
-        let updates: Partial<UserType> = {};
+        let updates: Partial<UserInputType> = {};
         switch (field) {
           case "username":
             await this.usernameLookup.transferLookupData(tx, username, value, {
@@ -249,7 +280,7 @@ export class UserModel extends FirebaseCollectionModel<
   }
 
   protected async updateUserSessionToken(userDoc: DocSnapType) {
-    const userData = this.format(userDoc, { keepAuth: true });
+    const userData = this.format(userDoc, { fullUser: true });
 
     const sessionToken = this.generateSessionToken();
 
@@ -285,7 +316,9 @@ export class UserModel extends FirebaseCollectionModel<
     password: UserFieldTypes["auth.password"],
   ) {
     // Find user
-    const snap = await this.findUser(this.ref().where(field, "==", identifier));
+    const snap = await this.findUserByQuery(
+      this.ref().where(field, "==", identifier),
+    );
 
     if (snap.empty) {
       throw new AuthenticationError("Invalid Credentials");
@@ -300,19 +333,52 @@ export class UserModel extends FirebaseCollectionModel<
     return await this.updateUserSessionToken(userDoc);
   }
 
-  override async findById(userId: string) {
+  override async findById(userId: string): Promise<DefaultUserOutputType>;
+  override async findById(
+    userId: string,
+    opts: { fullUser: true },
+  ): Promise<FullUserOutputType>;
+  override async findById(
+    userId: string,
+    opts: { fullIdentity: true },
+  ): Promise<IdentifiedUserType>;
+  override async findById(
+    userId: string,
+    opts?: { fullUser: true } | { fullIdentity: true },
+  ) {
     const doc = await this.getDocOrThrow(userId);
 
-    return this.format(doc);
+    if (!opts) {
+      return this.format(doc);
+    }
+
+    if ("fullUser" in opts) {
+      return this.format(doc, { fullUser: true });
+    }
+
+    if ("fullIdentity" in opts) {
+      return this.format(doc, { fullIdentity: true });
+    }
+
+    throw new InternalServerError("Invalid options for findById");
   }
 
   override async updateById(id: string, data: unknown): Promise<never> {
     throw new InternalServerError("Unimplimented");
   }
 
-  override async deleteById(id: string) {
+  override async deleteById(id: string): Promise<never> {
+    throw new InternalServerError("Unimplimented");
+  }
+
+  async deleteUser(id: string, password: string): Promise<{ success: true }> {
+    // Find user by id
     const userDoc = await this.getDocOrThrow(id);
 
+    // Authenticate delete request
+    await this.authenticateUser(userDoc, password);
+
+    // Proceed with deletion
     const userData = this.format(userDoc);
 
     try {
@@ -371,6 +437,19 @@ export const dbGetUserByField = async <T extends keyof UserQueriableFieldTypes>(
   by: T,
   val: UserQueriableFieldTypes[T],
 ) => await User.getUserByField(by, val);
+
+export const dbGetUserIdentity = async <
+  T extends keyof UserIdentifiableFieldTypes,
+>(
+  by: T,
+  val: UserIdentifiableFieldTypes[T],
+): Promise<IdentifiedUserType> => {
+  if (by === "id") {
+    return await User.findById(val, { fullIdentity: true });
+  } else {
+    return await User.getUserByField(by, val, { fullIdentity: true });
+  }
+};
 
 export const dbGetUserById = async (userId: string) =>
   await User.findById(userId);

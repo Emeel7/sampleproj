@@ -8,25 +8,34 @@ import type {
 
 export type UserSchemaType = typeof userSchema;
 
-export type UserType = z.infer<UserSchemaType>;
-
-export type DefaultUserOutputType = Omit<DbDocData<UserSchemaType>, "auth">;
-export type FullUserOutputType = DbDocData<UserSchemaType>;
-
 export type UserFieldTypes = {
   [K in keyof typeof userFieldSchemas]: z.infer<(typeof userFieldSchemas)[K]>;
 };
 
+export type NewUserDetails = Infer<typeof newUserDetailsSchema>;
+
+export type UserInputType = z.infer<UserSchemaType>;
+export type DefaultUserOutputType = Omit<DbDocData<UserSchemaType>, "auth">;
+export type FullUserOutputType = DbDocData<UserSchemaType>;
+export type IdentifiedUserType = RemoveKeys<
+  FullUserOutputType,
+  "auth" | "createdAt" | "updatedAt"
+> & {
+  sessionToken: UserFieldTypes["auth.sessionToken"];
+};
+export type UserIdentifiableFieldTypes = Pick<
+  UserFieldTypes,
+  "id" | "auth.sessionToken"
+>;
+
 export type UserQueriableFieldTypes = RemoveKeys<
   UserFieldTypes,
-  "auth.password"
+  "id" | "auth.password"
 >;
 
 export type UserUpdatableFieldTypes = RemoveKeys<
   UserFieldTypes,
-  "auth.password" | "auth.sessionToken"
+  "id" | "auth.password" | "auth.sessionToken"
 >;
-
-export type NewUserDetails = Infer<typeof newUserDetailsSchema>;
 
 export type UserLoginFieldTypes = Pick<UserFieldTypes, "email" | "username">;

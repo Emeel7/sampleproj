@@ -11,8 +11,14 @@ import {
   stripUndefinedFields,
   parseString,
 } from "../../utils/generalUtils.js";
-import type { NoteType } from "../../models/Note/note.types.js";
-import { noteSchema } from "../../models/Note/NoteSchemas.js";
+import type {
+  FullNoteType,
+  NewNoteInputType,
+} from "../../models/Note/note.types.js";
+import {
+  fullNoteSchema,
+  inputNoteSchema,
+} from "../../models/Note/NoteSchemas.js";
 
 export const findAllQueryParams = z.object({
   startDocId: z.string().trim().optional(),
@@ -24,10 +30,12 @@ export const parseNoteId = (body: string | string[] | undefined) => {
   return parseString(body, "note");
 };
 
-export const parseNoteData = (body: Request["body"]): NoteType | never => {
+export const parseNoteData = (
+  body: Request["body"],
+): NewNoteInputType | never => {
   const bodyAsObject = throwNonObjects(body);
 
-  const result = noteSchema.safeParse(bodyAsObject);
+  const result = inputNoteSchema.safeParse(bodyAsObject);
 
   if (!result.success) {
     throw new ValidationError(result.error.message);
@@ -38,7 +46,7 @@ export const parseNoteData = (body: Request["body"]): NoteType | never => {
 
 export const parseNoteDataPartial = (
   body: Request["body"],
-): Partial<NoteType> | never => {
+): Partial<FullNoteType> | never => {
   const bodyAsObject = throwNonObjects(body);
 
   const strippedObject = stripUndefinedFields(bodyAsObject);
@@ -47,7 +55,7 @@ export const parseNoteDataPartial = (
     throw new ValidationError("Nothing to update");
   }
 
-  const result = noteSchema.partial().safeParse(strippedObject);
+  const result = fullNoteSchema.partial().safeParse(strippedObject);
 
   if (!result.success) {
     throw new ValidationError(result.error.message);

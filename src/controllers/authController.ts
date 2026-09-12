@@ -68,8 +68,10 @@ export const loginUser = async (req: Request, res: Response) => {
 // @access Private
 export const refreshSessionToken = async (req: Request, res: Response) => {
   if (!req.identity) throw new ForbiddenError();
-  
-  const { sessionToken } = await dbUpdateUserSessionToken(req.identity.);
+
+  const { sessionToken } = await dbUpdateUserSessionToken(
+    req.identity.sessionToken,
+  );
 
   return res.cookie(...shortCookieArgs(sessionToken)).sendStatus(204);
 };

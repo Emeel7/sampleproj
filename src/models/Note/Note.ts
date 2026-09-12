@@ -6,7 +6,7 @@ export class NoteModel extends FirebaseCollectionModel<
   NoteSchemaType
 > {
   constructor() {
-    super(connectDB(), "notes", noteSchema);
+    super(connectDB(), "notes", fullNoteSchema);
   }
 
   async findAllFromUser(qry: findAllQueryConfig, userId: string) {
@@ -37,8 +37,8 @@ export const Note = new NoteModel();
  * Helper functions for database operations.
  */
 import { type findAllQueryConfig } from "../Base/CollectionModel.js";
-import type { NoteSchemaType, NoteType } from "./note.types.js";
-import { noteSchema } from "./NoteSchemas.js";
+import type { NoteSchemaType, FullNoteType } from "./note.types.js";
+import { fullNoteSchema } from "./NoteSchemas.js";
 import { ForbiddenError } from "../errors/Errors.js";
 
 // Retrieve all notes with optional query config
@@ -51,11 +51,11 @@ export const dbGetAllNotesFromUser = async (
 export const dbGetNote = async (id: string) => await Note.findById(id);
 
 // Create and store a new note. Accepts an object matching NoteType
-export const dbCreateAndStoreNote = async (note: NoteType) =>
+export const dbCreateAndStoreNote = async (note: FullNoteType) =>
   await Note.create(note);
 
 // Update an existing note by ID. Accepts partial updates validated by FireBaseModel.
-export const dbUpdateNote = async (id: string, note: Partial<NoteType>) =>
+export const dbUpdateNote = async (id: string, note: Partial<FullNoteType>) =>
   await Note.updateById(id, note);
 
 // Delete a note by its ID.
