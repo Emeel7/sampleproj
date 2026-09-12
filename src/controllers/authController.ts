@@ -5,15 +5,15 @@ import { type CookieOptions, type Request, type Response } from "express";
 import {
   dbCreateNewUser,
   dbLoginUser,
-  dbUpdateUserSessionToken,
+  dbLogoutUser,
+  dbRefreshUserSessionToken,
 } from "../models/User/Users.js";
 import {
   parseLoginAttempt,
   parseNewUserDetails,
   parseUserId,
 } from "./parsers/userRequestParsers.js";
-import { getUserIdentity } from "./parsers/noteRequestParsers.js";
-import { ForbiddenError } from "../models/errors/Errors.js";
+import { getUserIdentity } from "./parsers/authRequestParsers.js";
 
 // Util
 export const shortCookieArgs = (
@@ -67,11 +67,20 @@ export const loginUser = async (req: Request, res: Response) => {
 // @route POST /auth/refresh
 // @access Private
 export const refreshSessionToken = async (req: Request, res: Response) => {
-  if (!req.identity) throw new ForbiddenError();
+  const { sessionToken: oldSessionToken } = getUserIdentity(req);
 
-  const { sessionToken } = await dbUpdateUserSessionToken(
-    req.identity.sessionToken,
-  );
+  const { sessionToken } = await dbRefreshUserSessionToken(oldSessionToken);
 
   return res.cookie(...shortCookieArgs(sessionToken)).sendStatus(204);
+};
+
+// @desc Log out
+// @route POST /auth/logout
+// @access Private
+export const logoutUser = async (req: Request, res: Response) => {
+  const { sessionToken } = getUserIdentity(req);
+
+  await dbLogoutUser(sessionToken);
+
+  return res.clearCookie(USER_SESSION_COOKIE_NAME!).sendStatus(204);
 };

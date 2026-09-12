@@ -1,10 +1,6 @@
-import express, {
-  type Request,
-  type Response,
-  type NextFunction,
-} from "express";
+import { type Request, type Response, type NextFunction } from "express";
 
-import { dbGetUserByField, dbGetUserIdentity } from "../models/User/Users.js";
+import { dbGetUserIdentity } from "../models/User/Users.js";
 import { ForbiddenError } from "../models/errors/Errors.js";
 import cookieNames from "../config/cookies.js";
 

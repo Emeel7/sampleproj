@@ -1,5 +1,10 @@
 import FirebaseCollectionModel from "../Base/CollectionModel.js";
 import { connectDB } from "../../resources/database.js";
+import { type findAllQueryConfig } from "../Base/CollectionModel.js";
+import type { NoteSchemaType, FullNoteType } from "./note.types.js";
+import { fullNoteSchema } from "./NoteSchemas.js";
+import { ForbiddenError } from "../errors/Errors.js";
+import type { DocSnapType, DbDocData } from "../Base/base.types.js";
 
 export class NoteModel extends FirebaseCollectionModel<
   "notes",
@@ -9,7 +14,25 @@ export class NoteModel extends FirebaseCollectionModel<
     super(connectDB(), "notes", fullNoteSchema);
   }
 
-  async findAllFromUser(qry: findAllQueryConfig, userId: string) {
+  async findAllFromUser(
+    qry: findAllQueryConfig,
+    userId: string,
+  ): Promise<DbDocData<NoteSchemaType>[]>;
+  async findAllFromUser(
+    qry: findAllQueryConfig,
+    userId: string,
+    opts?: { dbDoc: true },
+  ): Promise<
+    FirebaseFirestore.QueryDocumentSnapshot<
+      FirebaseFirestore.DocumentData,
+      FirebaseFirestore.DocumentData
+    >[]
+  >;
+  async findAllFromUser(
+    qry: findAllQueryConfig,
+    userId: string,
+    opts?: { dbDoc: true },
+  ) {
     const { order = "asc", limit = 50, startDocId } = qry;
 
     let query = this.ref()
@@ -23,7 +46,24 @@ export class NoteModel extends FirebaseCollectionModel<
     }
 
     const snap = await query.get();
-    return snap.docs.map((d) => this.format(d));
+
+    if (!opts) {
+      return snap.docs.map((d) => this.format(d));
+    }
+
+    if ("dbDoc" in opts && opts.dbDoc) {
+      return snap.docs;
+    }
+  }
+
+  async deleteAllFromUser(userId: string) {
+    const noteSnaps = await this.findAllFromUser({ limit: 3000 }, userId, {
+      dbDoc: true,
+    });
+
+    await this.deleteMany(noteSnaps);
+
+    return { success: true, deletedCount: noteSnaps.length };
   }
 
   override async findAll(qry: findAllQueryConfig): Promise<never> {
@@ -32,14 +72,6 @@ export class NoteModel extends FirebaseCollectionModel<
 }
 
 export const Note = new NoteModel();
-
-/**
- * Helper functions for database operations.
- */
-import { type findAllQueryConfig } from "../Base/CollectionModel.js";
-import type { NoteSchemaType, FullNoteType } from "./note.types.js";
-import { fullNoteSchema } from "./NoteSchemas.js";
-import { ForbiddenError } from "../errors/Errors.js";
 
 // Retrieve all notes with optional query config
 export const dbGetAllNotesFromUser = async (

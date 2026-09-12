@@ -77,9 +77,3 @@ export const parseQuery = (
 
   return stripped;
 };
-
-export const getUserIdentity = (req: Request) => {
-  if (!req.identity) throw new ForbiddenError();
-
-  return req.identity;
-};

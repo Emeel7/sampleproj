@@ -73,3 +73,10 @@ export const parseUserResetAttempt = (body: Request["body"]) => {
 
   return result.data;
 };
+
+export const parseUserDeleteAttempt = (body: Request["body"]) => {
+  const result = parseSchema(PasswordSchema, body, "user-password", {
+    failureMessage: "Invalid password delete attempt data",
+  });
+  return result.data;
+};

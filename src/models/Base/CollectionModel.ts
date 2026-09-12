@@ -196,4 +196,18 @@ export default class FirebaseCollectionModel<
 
     return { success: true };
   }
+
+  protected async deleteMany(snaps: FirebaseFirestore.QueryDocumentSnapshot[]) {
+    const BATCH_SIZE = 500; // Firestore batch limit
+
+    for (let i = 0; i < snaps.length; i += BATCH_SIZE) {
+      const batch = this.db.batch();
+
+      for (const snap of snaps.slice(i, i + BATCH_SIZE)) {
+        batch.delete(snap.ref);
+      }
+
+      await batch.commit();
+    }
+  }
 }

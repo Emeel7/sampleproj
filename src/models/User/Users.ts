@@ -35,6 +35,7 @@ import {
   userFieldSchemas,
   userLookupSchema,
 } from "./UserSchemas.js";
+import { Note } from "../Note/Note.js";
 
 export class UserModel extends FirebaseCollectionModel<
   "users",
@@ -56,7 +57,7 @@ export class UserModel extends FirebaseCollectionModel<
     super(connectDB(), "users", userSchema);
   }
 
-  // Helpful
+  // ----------- UTILITY FUNCTIONS
   protected override format(d: DocSnapType): DefaultUserOutputType;
   protected override format(
     d: DocSnapType,
@@ -111,20 +112,7 @@ export class UserModel extends FirebaseCollectionModel<
     return snap;
   }
 
-  protected async authenticateUser(userDoc: DocSnapType, attemptPass: string) {
-    const userData = this.format(userDoc, { fullUser: true });
-
-    const match = await this.comparePassword(
-      attemptPass,
-      userData.auth.password,
-    );
-
-    if (!match) throw new AuthenticationError("Invalid Credentials");
-
-    return userData;
-  }
-
-  // Actual
+  // -------------- CREATE
   async createNewUser(config: NewUserDetails) {
     const { username, email, password } = config;
 
@@ -162,6 +150,44 @@ export class UserModel extends FirebaseCollectionModel<
     } catch (e) {
       this.handleFirestoreError(e);
     }
+  }
+
+  // -------------- READ
+  override async findAll() {
+    //    throw new ForbiddenError();
+    const snap = await this.ref().orderBy("createdAt", "asc").get();
+
+    return snap.docs.map((d) => this.format(d));
+  }
+
+  override async findById(userId: string): Promise<DefaultUserOutputType>;
+  override async findById(
+    userId: string,
+    opts: { fullUser: true },
+  ): Promise<FullUserOutputType>;
+  override async findById(
+    userId: string,
+    opts: { fullIdentity: true },
+  ): Promise<IdentifiedUserType>;
+  override async findById(
+    userId: string,
+    opts?: { fullUser: true } | { fullIdentity: true },
+  ) {
+    const doc = await this.getDocOrThrow(userId);
+
+    if (!opts) {
+      return this.format(doc);
+    }
+
+    if ("fullUser" in opts) {
+      return this.format(doc, { fullUser: true });
+    }
+
+    if ("fullIdentity" in opts) {
+      return this.format(doc, { fullIdentity: true });
+    }
+
+    throw new InternalServerError("Invalid options for findById");
   }
 
   async getUserByField<TField extends keyof UserQueriableFieldTypes>(
@@ -218,6 +244,7 @@ export class UserModel extends FirebaseCollectionModel<
     return this.format(userDoc);
   }
 
+  // ------------------ UPDATE
   async updateUserField<T extends keyof UserUpdatableFieldTypes>(
     userId: string,
     field: T,
@@ -279,7 +306,7 @@ export class UserModel extends FirebaseCollectionModel<
     return { sessionToken: newSessionToken };
   }
 
-  protected async updateUserSessionToken(userDoc: DocSnapType) {
+  protected async updateNewUserSessionToken(userDoc: DocSnapType) {
     const userData = this.format(userDoc, { fullUser: true });
 
     const sessionToken = this.generateSessionToken();
@@ -294,20 +321,48 @@ export class UserModel extends FirebaseCollectionModel<
     return { sessionToken };
   }
 
-  async updateUserSessionTokenWithId(userId: string) {
-    const userDoc = await this.getDocOrThrow(userId);
+  // ------------ DELETE
+  async deleteUser(id: string, password: string): Promise<{ success: true }> {
+    // Find user by id
+    const userDoc = await this.getDocOrThrow(id);
 
-    return await this.updateUserSessionToken(userDoc);
+    // Authenticate delete request
+    await this.authenticateUser(userDoc, password);
+
+    // Proceed with deletion
+    const userData = this.format(userDoc);
+
+    // Delete all notes associated with the user
+    await Note.deleteAllFromUser(userData.id);
+
+    // Finally delete the user and their lookup data in a transaction
+    try {
+      await this.db.runTransaction(async (tx) => {
+        // Delete lookup data
+        this.emailLookup.txDeleteDoc(tx, userData.id);
+        this.usernameLookup.txDeleteDoc(tx, userData.id);
+
+        // Delete user details
+        this.txDelete(tx, userDoc);
+      });
+    } catch (e) {
+      this.handleFirestoreError(e);
+    }
+    return { success: true };
   }
 
-  async updateUserSessionTokenWithSessionToken(sessionToken: string) {
-    const userDoc = await this.getUserByField(
-      "auth.sessionToken",
-      sessionToken,
-      { dbDoc: true },
+  // ------------ AUTH
+  protected async authenticateUser(userDoc: DocSnapType, attemptPass: string) {
+    const userData = this.format(userDoc, { fullUser: true });
+
+    const match = await this.comparePassword(
+      attemptPass,
+      userData.auth.password,
     );
 
-    return await this.updateUserSessionToken(userDoc);
+    if (!match) throw new AuthenticationError("Invalid Credentials");
+
+    return userData;
   }
 
   async loginUser<T extends keyof UserLoginFieldTypes>(
@@ -330,39 +385,40 @@ export class UserModel extends FirebaseCollectionModel<
     await this.authenticateUser(userDoc, password);
 
     // Update session token
-    return await this.updateUserSessionToken(userDoc);
+    return await this.updateNewUserSessionToken(userDoc);
   }
 
-  override async findById(userId: string): Promise<DefaultUserOutputType>;
-  override async findById(
-    userId: string,
-    opts: { fullUser: true },
-  ): Promise<FullUserOutputType>;
-  override async findById(
-    userId: string,
-    opts: { fullIdentity: true },
-  ): Promise<IdentifiedUserType>;
-  override async findById(
-    userId: string,
-    opts?: { fullUser: true } | { fullIdentity: true },
-  ) {
-    const doc = await this.getDocOrThrow(userId);
+  async updateUserSessionTokenWithId(userId: string) {
+    const userDoc = await this.getDocOrThrow(userId);
 
-    if (!opts) {
-      return this.format(doc);
-    }
-
-    if ("fullUser" in opts) {
-      return this.format(doc, { fullUser: true });
-    }
-
-    if ("fullIdentity" in opts) {
-      return this.format(doc, { fullIdentity: true });
-    }
-
-    throw new InternalServerError("Invalid options for findById");
+    return await this.updateNewUserSessionToken(userDoc);
   }
 
+  async updateUserSessionTokenWithSessionToken(sessionToken: string) {
+    const userDoc = await this.getUserByField(
+      "auth.sessionToken",
+      sessionToken,
+      { dbDoc: true },
+    );
+
+    return await this.updateNewUserSessionToken(userDoc);
+  }
+
+  async logoutUser(sessionToken: string) {
+    // Get the user
+    const userDoc = await this.getUserByField(
+      "auth.sessionToken",
+      sessionToken,
+      { dbDoc: true },
+    );
+
+    // Invalidate existing session token
+    await this.updateNewUserSessionToken(userDoc);
+
+    return { success: true };
+  }
+
+  // -------------- OVERRIDEN
   override async updateById(id: string, data: unknown): Promise<never> {
     throw new InternalServerError("Unimplimented");
   }
@@ -371,34 +427,7 @@ export class UserModel extends FirebaseCollectionModel<
     throw new InternalServerError("Unimplimented");
   }
 
-  async deleteUser(id: string, password: string): Promise<{ success: true }> {
-    // Find user by id
-    const userDoc = await this.getDocOrThrow(id);
-
-    // Authenticate delete request
-    await this.authenticateUser(userDoc, password);
-
-    // Proceed with deletion
-    const userData = this.format(userDoc);
-
-    try {
-      this.db.runTransaction(async (tx) => {
-        this.emailLookup.txDeleteDoc(tx, userData.id);
-        this.usernameLookup.txDeleteDoc(tx, userData.id);
-        this.txDelete(tx, userDoc);
-      });
-    } catch (e) {
-      this.handleFirestoreError(e);
-    }
-    return { success: true };
-  }
-
-  override async findAll() {
-    const snap = await this.ref().orderBy("createdAt", "asc").get();
-
-    return snap.docs.map((d) => this.format(d));
-  }
-
+  // ERROR HANDLING
   protected override handleFirestoreError(e: unknown): never {
     if (!isFirestoreError(e)) {
       console.log(e);
@@ -463,9 +492,6 @@ export const dbUpdateUserByField = async <
   userId: string,
 ) => await User.updateUserField(userId, by, val);
 
-export const dbUpdateUserSessionToken = async (sessionToken: string) =>
-  await User.updateUserSessionTokenWithSessionToken(sessionToken);
-
 export const dbUpdateUserPassword = async (
   userId: string,
   oldPass: string,
@@ -473,8 +499,8 @@ export const dbUpdateUserPassword = async (
 ) => await User.updateUserPassword(userId, oldPass, newPass);
 
 // DELETE
-export const dbDeleteUser = async (userId: string) =>
-  await User.deleteById(userId);
+export const dbDeleteUser = async (userId: string, password: string) =>
+  await User.deleteUser(userId, password);
 
 // AUTH
 export const dbLoginUser = async <T extends keyof UserLoginFieldTypes>(
@@ -482,3 +508,9 @@ export const dbLoginUser = async <T extends keyof UserLoginFieldTypes>(
   identifier: UserLoginFieldTypes[T],
   password: string,
 ) => await User.loginUser(by, identifier, password);
+
+export const dbRefreshUserSessionToken = async (sessionToken: string) =>
+  await User.updateUserSessionTokenWithSessionToken(sessionToken);
+
+export const dbLogoutUser = async (sessionToken: string) =>
+  await User.logoutUser(sessionToken);
