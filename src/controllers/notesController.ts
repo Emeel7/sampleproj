@@ -13,9 +13,9 @@ import {
   parseNoteData,
   parseNoteDataPartial,
   parseQuery,
-  getUserIdentity,
 } from "./parsers/noteRequestParsers.js";
 
+import { getUserIdentity } from "./parsers/authRequestParsers.js";
 // // -------- ROUTES
 
 // @desc Get all notes

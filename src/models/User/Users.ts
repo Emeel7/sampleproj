@@ -339,9 +339,10 @@ export class UserModel extends FirebaseCollectionModel<
     try {
       await this.db.runTransaction(async (tx) => {
         // Delete lookup data
-        this.emailLookup.txDeleteDoc(tx, userData.id);
-        this.usernameLookup.txDeleteDoc(tx, userData.id);
+        this.emailLookup.txDeleteDoc(tx, userData.email);
+        this.usernameLookup.txDeleteDoc(tx, userData.username);
 
+        console.log("Was deleet!", userData);
         // Delete user details
         this.txDelete(tx, userDoc);
       });

@@ -1,7 +1,6 @@
 import { type Request } from "express";
 import {
   BadRequestError,
-  ForbiddenError,
   ValidationError,
 } from "../../models/errors/Errors.js";
 import { type findAllQueryConfig } from "../../models/Base/CollectionModel.js";

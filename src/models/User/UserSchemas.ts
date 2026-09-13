@@ -58,3 +58,7 @@ export const passwordUpdateAttemptSchema = z.object({
   oldPass: PasswordSchema,
   newPass: PasswordSchema,
 });
+
+export const deleteRequestAttempSchema = z.object({
+  password: PasswordSchema,
+});

@@ -7,11 +7,13 @@ import {
   dbLoginUser,
   dbLogoutUser,
   dbRefreshUserSessionToken,
+  dbUpdateUserPassword,
 } from "../models/User/Users.js";
 import {
   parseLoginAttempt,
   parseNewUserDetails,
   parseUserId,
+  parseUserResetAttempt,
 } from "./parsers/userRequestParsers.js";
 import { getUserIdentity } from "./parsers/authRequestParsers.js";
 
@@ -36,7 +38,7 @@ export const shortCookieArgs = (
 // // -------- ROUTES
 
 // @desc Register a new user
-// @route POST /auth/signup
+// @route POST /auth/REGISTER
 // @access Private
 export const registerNewUser = async (req: Request, res: Response) => {
   const newUserDetails = parseNewUserDetails(req.body);
@@ -83,4 +85,17 @@ export const logoutUser = async (req: Request, res: Response) => {
   await dbLogoutUser(sessionToken);
 
   return res.clearCookie(USER_SESSION_COOKIE_NAME!).sendStatus(204);
+};
+
+// @desc Update user password
+// @route PATCH /auth/update-password
+// @access Private
+export const updateUserPassword = async (req: Request, res: Response) => {
+  const { id } = getUserIdentity(req);
+
+  const { oldPass, newPass } = parseUserResetAttempt(req.body);
+
+  const { sessionToken } = await dbUpdateUserPassword(id, oldPass, newPass);
+
+  return res.cookie(...shortCookieArgs(sessionToken)).sendStatus(204);
 };

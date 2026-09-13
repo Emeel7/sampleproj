@@ -7,6 +7,7 @@ import {
   userUpdateAttemptSchema,
   PasswordSchema,
   passwordUpdateAttemptSchema,
+  deleteRequestAttempSchema,
 } from "../../models/User/UserSchemas.js";
 import { type NewUserDetails } from "../../models/User/users.types.js";
 import { parseSchema } from "../../utils/utils.js";
@@ -75,7 +76,7 @@ export const parseUserResetAttempt = (body: Request["body"]) => {
 };
 
 export const parseUserDeleteAttempt = (body: Request["body"]) => {
-  const result = parseSchema(PasswordSchema, body, "user-password", {
+  const result = parseSchema(deleteRequestAttempSchema, body, "user-password", {
     failureMessage: "Invalid password delete attempt data",
   });
   return result.data;

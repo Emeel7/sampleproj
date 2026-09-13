@@ -26,7 +26,10 @@ app.use(connectDB);
 // // ---- ROUTES
 import authRoutes from "./routes/authRoutes.js";
 import notesRoutes from "./routes/notesRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
+
 app.use("/auth", authRoutes);
+app.use("/users", userRoutes);
 app.use(authenticate);
 app.use("/notes", notesRoutes);
 

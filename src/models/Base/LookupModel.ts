@@ -1,10 +1,9 @@
 import admin from "firebase-admin";
-import { ConflictError, DocumentNotFoundError } from "../errors/Errors.js";
+import { DocumentNotFoundError } from "../errors/Errors.js";
 
 import { z } from "zod";
 import type {
   DbDocData,
-  DbDocType,
   DocSnapType,
   Infer,
   Parsed,
@@ -49,7 +48,7 @@ export default class FirebaseLookupModel<
       );
     }
 
-    return { id: d.id, ...(d.data() as DbDocData<T>) };
+    return { id: d.id, ...d.data() } as DbDocData<T>;
   }
 
   protected schemaParse(data: unknown) {
