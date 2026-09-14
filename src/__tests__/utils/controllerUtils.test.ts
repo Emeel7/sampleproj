@@ -6,7 +6,7 @@ import {
 import {
   stripUndefinedFields,
   throwNonObjects,
-  parseId,
+  parseNoteId,
   parseNoteData,
   parseNoteDataPartial,
   parseFindAllNotesQuery,
@@ -61,14 +61,14 @@ describe("parseId", () => {
   it.each(invalidValues)(
     "throws BadRequestError if id is invalid (%p)",
     (val) => {
-      expect(() => parseId(val as any)).toThrow(BadRequestError);
+      expect(() => parseNoteId(val as any)).toThrow(BadRequestError);
     },
   );
 
   // Test valid IDs
   const validValues = ["note-id"];
   it.each(validValues)("returns string if id is valid (%p)", (val) => {
-    expect(parseId(val)).toBe(val);
+    expect(parseNoteId(val)).toBe(val);
   });
 });
 
