@@ -4,13 +4,16 @@ import {
   ValidationError,
 } from "../../models/errors/Errors.js";
 import {
-  stripUndefinedFields,
-  throwNonObjects,
   parseNoteId,
   parseNoteData,
   parseNoteDataPartial,
   parseFindAllNotesQuery,
 } from "../../controllers/parsers/noteRequestParsers.js";
+
+import {
+  stripUndefinedFields,
+  throwNonObjects,
+} from "../../utils/generalUtils.js";
 
 describe("Utils: stripUndefinedFields and throwNonObjects", () => {
   // -- stripUndefinedFields
