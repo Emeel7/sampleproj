@@ -1,6 +1,7 @@
 import { type Request } from "express";
 import {
   BadRequestError,
+  ForbiddenError,
   ValidationError,
 } from "../../models/errors/Errors.js";
 import { type findAllQueryConfig } from "../../models/Base/CollectionModel.js";
@@ -18,6 +19,8 @@ import {
   fullNoteSchema,
   inputNoteSchema,
 } from "../../models/Note/NoteSchemas.js";
+import { Note } from "../../models/Note/Note.js";
+import { getUserIdentity } from "./authRequestParsers.js";
 
 export const findAllQueryParams = z.object({
   startDocId: z.string().trim().optional(),
@@ -63,7 +66,7 @@ export const parseNoteDataPartial = (
   return result.data as any;
 };
 
-export const parseQuery = (
+export const parseFindAllNotesQuery = (
   qry: Request["query"],
 ): findAllQueryConfig | never => {
   const result = findAllQueryParams.partial().safeParse(qry);
@@ -75,4 +78,12 @@ export const parseQuery = (
   const stripped = stripUndefinedFields(result.data);
 
   return stripped;
+};
+
+export const confirmNoteOwnership = async (noteId: string, req: Request) => {
+  const note = await Note.findById(noteId);
+
+  const { id: userId } = getUserIdentity(req);
+
+  if (note.userId !== userId) throw new ForbiddenError();
 };

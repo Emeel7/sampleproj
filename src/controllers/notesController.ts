@@ -12,7 +12,8 @@ import {
   parseNoteId,
   parseNoteData,
   parseNoteDataPartial,
-  parseQuery,
+  parseFindAllNotesQuery,
+  confirmNoteOwnership,
 } from "./parsers/noteRequestParsers.js";
 
 import { getUserIdentity } from "./parsers/authRequestParsers.js";
@@ -22,7 +23,7 @@ import { getUserIdentity } from "./parsers/authRequestParsers.js";
 // @route GET /
 // @access Private
 export const getAllNotesFromUser = async (req: Request, res: Response) => {
-  const qry = parseQuery(req.query);
+  const qry = parseFindAllNotesQuery(req.query);
 
   const { id: userId } = getUserIdentity(req);
 
@@ -50,6 +51,8 @@ export const addNote = async (req: Request, res: Response) => {
 export const getNote = async (req: Request, res: Response) => {
   const id = parseNoteId(req.params.id);
 
+  await confirmNoteOwnership(id, req);
+
   const note = await dbGetNote(id);
 
   return res.status(200).json(note);
@@ -60,6 +63,9 @@ export const getNote = async (req: Request, res: Response) => {
 // @access Private
 export const updateNote = async (req: Request, res: Response) => {
   const id = parseNoteId(req.params.id);
+
+  await confirmNoteOwnership(id, req);
+
   const noteData = parseNoteDataPartial(req.body);
 
   const updatedNote = await dbUpdateNote(id, noteData);
@@ -73,7 +79,9 @@ export const updateNote = async (req: Request, res: Response) => {
 export const deleteNote = async (req: Request, res: Response) => {
   const id = parseNoteId(req.params.id);
 
-  const result = await dbDeleteNote(id);
+  await confirmNoteOwnership(id, req);
+
+  await dbDeleteNote(id);
 
   return res.sendStatus(204);
 };

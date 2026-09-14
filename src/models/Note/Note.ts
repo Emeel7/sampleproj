@@ -42,6 +42,10 @@ export class NoteModel extends FirebaseCollectionModel<
 
     if (startDocId) {
       const startDocSnap = await this.getDocOrThrow(startDocId);
+
+      const noteData = this.format(startDocSnap);
+
+      if (noteData.userId !== userId) throw new ForbiddenError();
       query = query.startAfter(startDocSnap);
     }
 

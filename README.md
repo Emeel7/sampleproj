@@ -1,99 +1,177 @@
 # Simple Notes Backend Project
 
-A RESTful backend for managing notes using Node.js, Express, and Firestore
+A RESTful backend for managing user accounts and notes using Node.js, Express, TypeScript, and Firebase Firestore.
 
-This project also serves as a base for easy setup of other backend projects
-
-You can access the live application here:
-
-https://notes-react-app-seven.vercel.app/
+This project also serves as a foundation for setting up other backend projects with structured routing, validation, error handling, authentication, and session management.
 
 ---
 
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [API Endpoints](#api-endpoints)
-2. [Features](#features)
-3. [Tech Stack](#tech-stack)
-4. [Folder Structure](#folder-structure)
-5. [Installation](#installation)
-6. [Configuring Environment Variables](#configuring-environment-variables)
-7. [Usage](#usage)
-10. [Error Handling](#error-handling)
-11. [Deployment](#deployment)
-12. [Contributing](#contributing)
-13. [License](#license)
-14. [References](#references)
+2. [Database Structure](#database-structure)
+3. [API Endpoints](#api-endpoints)
+4. [Features](#features)
+5. [Tech Stack](#tech-stack)
+6. [Folder Structure](#folder-structure)
+7. [Installation](#installation)
+8. [Configuring Environment Variables](#configuring-environment-variables)
+9. [Usage](#usage)
+10. [Middleware](#middleware)
+11. [Error Handling](#error-handling)
+12. [Deployment](#deployment)
+13. [Contributing](#contributing)
+14. [License](#license)
+15. [References](#references)
 
 ---
 
 ## Overview
 
-The overview of the backend is pretty simple. It's goal is to store notes which are of the following structure:
+Version 3 introduces user accounts and basic session management alongside the existing note-management functionality.
 
-**Entity: `Note`**
+The backend consists of two primary entities:
 
-| Field     | Type      | Required | Description                |
-| --------- | --------- | -------- | -------------------------- |
-| id        | string    | Yes      | Unique identifier          |
-| title     | string    | Yes      | Short title of the note    |
-| content   | string    | Yes      | Main note body             |
-| createdAt | timestamp | Yes      | Time note was created      |
-| updatedAt | timestamp | Yes      | Time note was last updated |
+- `User` — represents an account and its authentication information.
+- `Note` — represents a note belonging to a specific user.
+
+Authenticated requests are associated with a user through session-based authentication.
+
+---
+
+## Database Structure
+
+### Entity: `Note`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | string | Unique identifier for the note |
+| `userId` | string | Identifier of the user who owns the note |
+| `title` | string | Title of the note |
+| `content` | string | Main body of the note |
+| `createdAt` | timestamp | Time at which the note was created |
+| `updatedAt` | timestamp | Time at which the note was last updated |
+
+### Entity: `User`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `username` | string | Unique username associated with the account |
+| `email` | string | Email address associated with the account |
+| `auth.password` | string | Password-related authentication data |
+| `auth.sessionToken` | string | Token used for session authentication |
+
+The `auth` field groups authentication-related information:
+
+```text
+auth
+├─ password
+└─ sessionToken
+```
 
 ---
 
 ## API Endpoints
 
-| Method | Route | Description | Body / Params |
-| ------ | ----- | ----------- | ------------- |
-| GET    | /notes     | Fetch notes in a batch | Query params: `startDocId` (optional), `limit` (optional, default 2), `order` (optional, default `asc`) |
-| POST   | /notes     | Create a new note | `title` (non-empty string), `content` (non-empty string) |
-| GET    | /notes/:id | Get a note by ID | `id` |
-| PATCH    | /notes/:id | Update note by ID | `id` + note body |
-| DELETE | /notes/:id | Delete note by ID | |
+### Authentication — `/auth`
 
---- 
+| Method | Route | Description |
+| --- | --- | --- |
+| `POST` | `/auth/register` | Register a new account |
+| `POST` | `/auth/login` | Authenticate a user and establish a session |
+| `POST` | `/auth/refresh` | Refresh the current session token |
+| `POST` | `/auth/logout` | Log out the current user and invalidate the session |
+| `POST` | `/auth/update-password` | Update the authenticated user's password |
+
+### Users — `/users`
+
+| Method | Route | Authentication | Description |
+| --- | --- | --- | --- |
+| `GET` | `/users` | Not required | Retrieve all users |
+| `GET` | `/users/:id` | Required | Retrieve a user by ID |
+| `PATCH` | `/users/:id` | Required | Update a user's username or email |
+| `DELETE` | `/users/:id` | Required | Delete an account |
+
+### Notes — `/notes`
+
+All note routes require authentication. Notes are associated with the authenticated user.
+
+| Method | Route | Description |
+| --- | --- | --- |
+| `GET` | `/notes` | Retrieve all notes belonging to the authenticated user |
+| `POST` | `/notes` | Create a new note |
+| `GET` | `/notes/:id` | Retrieve a specific note belonging to the user |
+| `PATCH` | `/notes/:id` | Update a specific note |
+| `DELETE` | `/notes/:id` | Delete a specific note |
+
+---
 
 ## Features
 
-- CRUD Notes
-- Firebase Firestore Integration
-- Structured Logging (For Development; see *********)
-- Pagination Support
+### User Features
+
+- Account creation
+- User login
+- User logout
+- Session management
+- Session token refresh
+- Password updates
+- Username and email updates
+- Account deletion
+
+### Note Features
+
+- Create notes
+- Retrieve notes belonging to a user
+- Retrieve individual notes
+- Update notes
+- Delete notes
+
+### Other Features
+
+- Structured logging
+- Request validation and parsing
+- Authentication middleware
+- Structured error handling
+- Firebase Firestore integration
 
 ---
 
 ## Tech Stack
 
-- Node.js (ESM / Nodenext )
+- Node.js
 - Express.js
-- Typescript
-- Firebase (Firestore)
-- tsx (dev runtime)
-- Vercel (serverless deployment)
-- Other libraries/tools as needed
+- TypeScript
+- Firebase Firestore
+- `tsx`
+- Vercel
+- Other libraries and tools as required
+
+The project uses Node.js ESM / NodeNext module configuration.
 
 ---
 
 ## Folder Structure
 
-```
+```text
 project-root/
 ├─ docs/
 ├─ logs/ (runtime)
 ├─ dist/ (runtime: build output)
 ├─ src/
-│ ├─ __test__/
-│ ├─ config/
-│ ├─ controllers/
-│ ├─ logs/
-│ ├─ middleware/
-│ ├─ models/
-│ ├─ resources/
-│ ├─ routes/
-│ └─ server.ts
+│  ├─ tests/
+│  ├─ config/
+│  ├─ controllers/
+│  │  └─ parsers/
+│  ├─ logs/
+│  ├─ middleware/
+│  │  └─ authenticate.ts
+│  ├─ models/
+│  ├─ resources/
+│  ├─ routes/
+│  ├─ types/
+│  ├─ utils/
+│  └─ server.ts
 ├─ .gitignore
 ├─ jest.config.js
 ├─ package.json
@@ -101,118 +179,155 @@ project-root/
 ├─ tsconfig.json
 ├─ README.md
 └─ CHANGELOG.md
-
-
 ```
+
+### Notable Directories
+
+**`controllers/parsers/`**
+
+Contains parsers responsible for schema-validating incoming request data, including:
+
+- `req.params`
+- `req.query`
+- `req.body`
+
+These parsers extract the required data or throw an appropriate error when the supplied data is invalid.
+
+**`middleware/authenticate.ts`**
+
+Provides session authentication by validating the user's session token and associating the authenticated user with the request.
+
+**`types/`**
+
+Contains TypeScript type definitions used throughout the application.
+
+**`utils/`**
+
+Contains reusable utility functions used by different parts of the backend.
+
+**`tests/`**
+
+Contains automated tests for the application.
 
 ---
 
 ## Installation
 
 ```bash
-# Clone the repo
+# Clone the repository
 git clone "https://github.com/BrianKamauKahara/SimpleProjectBackend"
 
-# Navigate to project
+# Navigate to the project
 cd <project-folder>
 
 # Install dependencies
 npm install
-
 ```
+
+---
 
 ## Configuring Environment Variables
 
-Environment Variables: Firebase Credentials (FIREBASE_CRED) and Preferred port number (PORT, default 5000) 
+The environment configuration remains unchanged from the previous version.
 
-Setting Firebase Credentials
-You will only need your own firebase credentials as the environment variable.
-To accomplish this, follow the steps below:
-1. Go to the [firebase website](https://firebase.google.com/products/firestore) and create your own firestore project
-2. Download your credentials JSON file
-3. Stringify the credential file using JSON.stringify and store the result in the .env. Make sure to remove the quotation marks
+The backend requires Firebase credentials and an optional preferred port number.
 
 ```bash
 PORT=<preferred_port_number>
 FIREBASE_CRED=<parsed_json_credential>
 ```
 
+### Setting Firebase Credentials
+
+1. Create a Firestore project through Firebase.
+2. Download the project's credentials JSON file.
+3. Parse the credentials using `JSON.stringify`.
+4. Store the resulting value in the `.env` file as `FIREBASE_CRED`.
+5. Remove the surrounding quotation marks from the stored value.
+
 ---
 
 ## Usage
 
-This is how you will run the project locally
+Run the project locally using:
 
 ```bash
-# Run server locally
+# Run the server locally
 npm start
 
-# Or with hot reload
+# Or run with hot reload
 npm run dev
-
 ```
-
-
-## Middleware
-
-- **Database Connector (dbConn.js)**: ensures Firestore is connected  
-- **EventLogger**: logs all incoming requests  
-- **ErrorLogger**: catches, logs and responds with structured error messages
-
-
-## Error Handling
-
-Errors from the bad requests, invalid requests, internal and other are formatted as follows:
-
-```json
-
-"error": {
-  "name": "Name of the error that occurred",
-  "message": "Description of error",
-  "code": "Error code. Check example codes below"
-}
-
-```
-
-There are four main types of errors, as indicated in the following table
-
-| Error | Code | Message / Meaning | 
-| ----- | ---- | ----------------- | 
-| DocumentNotFoundError | 404 | Document of a certain ID has not been found / does not exist | 
-| BadRequestError | 400 | Request Body / Query / Parameters of invalid type | 
-| ValidationError | 400 | Document structure is invalid | 
-| InternalServerError | 500 | Something went wrong internally, e.g. failed to connect to firestore | 
-
 
 ---
 
+## Middleware
+
+The backend uses middleware for database connectivity, logging, error handling, and authentication.
+
+- **Database Connector (`dbConn`)** — ensures that a connection to Firestore is available.
+- **EventLogger** — records incoming requests.
+- **ErrorLogger** — catches, logs, and responds to errors using structured error messages.
+- **Authentication Middleware (`authenticate.ts`)** — authenticates user sessions and provides the authenticated user to protected routes.
+
+Protected user and note operations require successful authentication before the corresponding controller is executed.
+
+---
+
+## Error Handling
+
+Errors are returned using a structured format:
+
+```json
+{
+  "error": {
+    "name": "Name of the error that occurred",
+    "message": "Description of the error",
+    "code": "Error code"
+  }
+}
+```
+
+The primary application errors include:
+
+| Error | Code | Meaning |
+| --- | ---: | --- |
+| `BadRequestError` | 400 | The request contains invalid parameters, query data, or body data |
+| `ValidationError` | 400 | The supplied data does not satisfy the required schema |
+| `AuthenticationError` | 401 | Authentication failed, such as when an incorrect password is supplied |
+| `ForbiddenError` | 403 | The authenticated user is not authorized to access the requested resource |
+| `DocumentNotFoundError` | 404 | A document with the specified identifier does not exist |
+| `ConflictError` | 409 | A request conflicts with an existing resource, such as attempting to use an already-existing username |
+| `InternalServerError` | 500 | An unexpected internal error occurred, such as a failure to connect to Firestore |
+
+---
 
 ## Deployment
 
-If you wish to also deploy on vercel, I would recommend:
+The project can be deployed to Vercel.
 
-1. Push repo to GitHub  
-2. Connect GitHub repo to Vercel  
-3. Configure environment variables in Vercel dashboard  
-4. Deploy → check serverless logs for any issues
+Recommended deployment procedure:
 
-I have worked to fix the issues that happen during deployment. If you face any feel free to contact me
+1. Push the repository to GitHub.
+2. Connect the repository to Vercel.
+3. Configure the required environment variables in the Vercel dashboard.
+4. Deploy the project.
+5. Review the serverless logs for deployment or runtime errors.
 
+---
 
 ## Contributing
 
-I'd be happy to see your contributions. If you wish to contribute:
+Contributions are welcome.
 
-- Fork the repository and create a new branch for your feature or bug fix.  
-- Make your changes and test them locally.  
-- Submit a Pull Request describing what you changed and why.  
-- For bugs or feature requests, open an Issue with a clear description.  
+To contribute:
 
-## Legacy (v1)
-See: `legacy/v1.md`
+- Fork the repository and create a new branch for your feature or bug fix.
+- Make the required changes and test them locally.
+- Submit a Pull Request describing what was changed and why.
+- For bugs or feature requests, open an Issue with a clear description.
 
-## Changelog
-See: `CHANGELOG.md`
+---
 
 ## License
 
@@ -238,9 +353,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+---
 
 ## References
 
-- [Firebase Docs](https://firebase.google.com/docs)  
-- [Express Docs](https://expressjs.com)  
-- [Vercel Docs](https://vercel.com/docs)
+- [Firebase Documentation](https://firebase.google.com/docs)
+- [Express Documentation](https://expressjs.com)
+- [Vercel Documentation](https://vercel.com/docs)
