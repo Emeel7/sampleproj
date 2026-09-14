@@ -292,7 +292,7 @@ export class UserModel extends FirebaseCollectionModel<
   ) {
     const userDoc = await this.getDocOrThrow(userId);
 
-    this.authenticateUser(userDoc, oldPass);
+    await this.authenticateUser(userDoc, oldPass);
 
     const newSessionToken = this.generateSessionToken();
 
@@ -361,7 +361,12 @@ export class UserModel extends FirebaseCollectionModel<
       userData.auth.password,
     );
 
-    if (!match) throw new AuthenticationError("Invalid Credentials");
+    try {
+      if (!match) throw new AuthenticationError("Invalid Credentials");
+    } catch (e) {
+      console.log(e);
+      throw e;
+    }
 
     return userData;
   }
