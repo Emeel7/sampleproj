@@ -1,50 +1,98 @@
-import FirebaseCollectionModel from '../base/CollectionModel.js'
-import { z } from 'zod'
-import { connectDB } from '../../resources/database.js'
-/**
- * Define the schema for a Note.
- * - title: required non-empty string
- * - content: required non-empty string
- * Using Zod for runtime validation.
- */
+import FirebaseCollectionModel from "../Base/CollectionModel.js";
+import { connectDB } from "../../resources/database.js";
+import { type findAllQueryConfig } from "../Base/CollectionModel.js";
+import type { NoteSchemaType, FullNoteType } from "./note.types.js";
+import { fullNoteSchema } from "./NoteSchemas.js";
+import { ForbiddenError } from "../errors/Errors.js";
+import type { DocSnapType, DbDocData } from "../Base/base.types.js";
 
-export const noteSchema = z.object({
-    title: zEnforceNonEmptyStr('Title'),
-    content: zEnforceNonEmptyStr('Content'),
-    userId: z.string().trim()
-})
+export class NoteModel extends FirebaseCollectionModel<
+  "notes",
+  NoteSchemaType
+> {
+  constructor() {
+    super(connectDB(), "notes", fullNoteSchema);
+  }
 
-export type NoteType = z.infer<typeof noteSchema>
+  async findAllFromUser(
+    qry: findAllQueryConfig,
+    userId: string,
+  ): Promise<DbDocData<NoteSchemaType>[]>;
+  async findAllFromUser(
+    qry: findAllQueryConfig,
+    userId: string,
+    opts?: { dbDoc: true },
+  ): Promise<
+    FirebaseFirestore.QueryDocumentSnapshot<
+      FirebaseFirestore.DocumentData,
+      FirebaseFirestore.DocumentData
+    >[]
+  >;
+  async findAllFromUser(
+    qry: findAllQueryConfig,
+    userId: string,
+    opts?: { dbDoc: true },
+  ) {
+    const { order = "asc", limit = 50, startDocId } = qry;
 
+    let query = this.ref()
+      .where("userId", "==", userId)
+      .orderBy("createdAt", order)
+      .limit(limit);
 
-/**
- * Create a FireBaseModel instance for notes collection.
- * Provides CRUD methods for interacting with Firestore.
-*/
-export const Note = new FirebaseCollectionModel(connectDB(), 'notes', noteSchema)
+    if (startDocId) {
+      const startDocSnap = await this.getDocOrThrow(startDocId);
 
-/**
- * Helper functions for database operations.
-*/
-import { type findAllQueryConfig } from '../base/CollectionModel.js'
-import { zEnforceNonEmptyStr } from '../../utils/utils.js'
+      const noteData = this.format(startDocSnap);
 
-// Retrieve all notes with optional query config 
-export const dbGetAllNotes = async (config: findAllQueryConfig) =>
-    await Note.findAll(config)
+      if (noteData.userId !== userId) throw new ForbiddenError();
+      query = query.startAfter(startDocSnap);
+    }
+
+    const snap = await query.get();
+
+    if (!opts) {
+      return snap.docs.map((d) => this.format(d));
+    }
+
+    if ("dbDoc" in opts && opts.dbDoc) {
+      return snap.docs;
+    }
+  }
+
+  async deleteAllFromUser(userId: string) {
+    const noteSnaps = await this.findAllFromUser({ limit: 3000 }, userId, {
+      dbDoc: true,
+    });
+
+    await this.deleteMany(noteSnaps);
+
+    return { success: true, deletedCount: noteSnaps.length };
+  }
+
+  override async findAll(qry: findAllQueryConfig): Promise<never> {
+    throw new ForbiddenError();
+  }
+}
+
+export const Note = new NoteModel();
+
+// Retrieve all notes with optional query config
+export const dbGetAllNotesFromUser = async (
+  config: findAllQueryConfig,
+  userId: string,
+) => await Note.findAllFromUser(config, userId);
 
 // Retrieve a single note by its ID.
-export const dbGetNote = async (id: string) =>
-    await Note.findById(id)
+export const dbGetNote = async (id: string) => await Note.findById(id);
 
 // Create and store a new note. Accepts an object matching NoteType
-export const dbCreateAndStoreNote = async (note: NoteType) =>
-    await Note.create(note)
+export const dbCreateAndStoreNote = async (note: FullNoteType) =>
+  await Note.create(note);
 
 // Update an existing note by ID. Accepts partial updates validated by FireBaseModel.
-export const dbUpdateNote = async (id: string, note: Partial<NoteType>) =>
-    await Note.updateById(id, note)
+export const dbUpdateNote = async (id: string, note: Partial<FullNoteType>) =>
+  await Note.updateById(id, note);
 
 // Delete a note by its ID.
-export const dbDeleteNote = async (id: string) =>
-    await Note.deleteById(id)
+export const dbDeleteNote = async (id: string) => await Note.deleteById(id);

@@ -1,69 +1,87 @@
-import { type Request, type Response } from "express"
+import { type Request, type Response } from "express";
 import {
-    dbGetAllNotes,
-    dbGetNote,
-    dbCreateAndStoreNote,
-    dbUpdateNote,
-    dbDeleteNote
-} from '../models/Note/Note.js'
+  dbGetAllNotesFromUser,
+  dbGetNote,
+  dbCreateAndStoreNote,
+  dbUpdateNote,
+  dbDeleteNote,
+} from "../models/Note/Note.js";
 
 // // -------- UTIL
-import { parseNoteId, parseNoteData, parseNoteDataPartial, parseQuery } from './parsers/noteRequestParsers.js'
+import {
+  parseNoteId,
+  parseNoteData,
+  parseNoteDataPartial,
+  parseFindAllNotesQuery,
+  confirmNoteOwnership,
+} from "./parsers/noteRequestParsers.js";
 
+import { getUserIdentity } from "./parsers/authRequestParsers.js";
 // // -------- ROUTES
 
 // @desc Get all notes
 // @route GET /
 // @access Private
-export const getAllNotes = async (req: Request, res: Response) => {
-    const qry = parseQuery(req.query)
+export const getAllNotesFromUser = async (req: Request, res: Response) => {
+  const qry = parseFindAllNotesQuery(req.query);
 
-    const notes = await dbGetAllNotes(qry)
+  const { id: userId } = getUserIdentity(req);
 
-    return res.status(200).json(notes)
-}
+  const notes = await dbGetAllNotesFromUser(qry, userId);
+
+  return res.status(200).json(notes);
+};
 
 // @desc Add new note
 // @route POST /
 // @access Private
 export const addNote = async (req: Request, res: Response) => {
-    const { title, content, userId } = parseNoteData(req.body)
+  const { id: userId } = getUserIdentity(req);
 
-    const newNote = await dbCreateAndStoreNote({ title, content, userId })
+  const { title, content } = parseNoteData(req.body);
 
-    return res.status(201).json(newNote)
-}
+  const newNote = await dbCreateAndStoreNote({ title, content, userId });
+
+  return res.status(201).json(newNote);
+};
 
 // @desc Get specified note
 // @route GET /:id
 // @access Private
 export const getNote = async (req: Request, res: Response) => {
-    const id = parseNoteId(req.params.id)
+  const id = parseNoteId(req.params.id);
 
-    const note = await dbGetNote(id)
+  await confirmNoteOwnership(id, req);
 
-    return res.status(200).json(note)
-}
+  const note = await dbGetNote(id);
+
+  return res.status(200).json(note);
+};
 
 // @desc Update specified note
 // @route PATCH /:id
 // @access Private
 export const updateNote = async (req: Request, res: Response) => {
-    const id = parseNoteId(req.params.id)
-    const noteData = parseNoteDataPartial(req.body)
+  const id = parseNoteId(req.params.id);
 
-    const updatedNote = await dbUpdateNote(id, noteData)
+  await confirmNoteOwnership(id, req);
 
-    return res.status(200).json(updatedNote)
-}
+  const noteData = parseNoteDataPartial(req.body);
 
-// @desc Delete Update specified note
+  const updatedNote = await dbUpdateNote(id, noteData);
+
+  return res.status(200).json(updatedNote);
+};
+
+// @desc Delete specified note
 // @route DELETE /:id
 // @access Private
 export const deleteNote = async (req: Request, res: Response) => {
-    const id = parseNoteId(req.params.id)
+  const id = parseNoteId(req.params.id);
 
-    const result = await dbDeleteNote(id)
+  await confirmNoteOwnership(id, req);
 
-    return res.sendStatus(204)
-}
+  await dbDeleteNote(id);
+
+  return res.sendStatus(204);
+};

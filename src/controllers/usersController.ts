@@ -1,71 +1,74 @@
-import { type Request, type Response } from "express"
+import { type Request, type Response } from "express";
 import {
-    dbGetAllUsers,
-    dbUpdateUserByField,
-    dbDeleteUser,
-    dbGetUserById,
-    dbUpdateUserPassword
-} from '../models/User/Users.js'
-
+  dbGetAllUsers,
+  dbUpdateUserByField,
+  dbDeleteUser,
+  dbGetUserById,
+} from "../models/User/Users.js";
+import cookieNames from "../config/cookies.js";
 // // -------- UTIL
-import { parseUserId, parseUserResetAttempt, parseUserUpdateAttempt } from './parsers/userRequestParsers.js'
+import {
+  parseUserDeleteAttempt,
+  parseUserId,
+  parseUserUpdateAttempt,
+} from "./parsers/userRequestParsers.js";
 
+import { getUserIdentity } from "./parsers/authRequestParsers.js";
+import { ForbiddenError } from "../models/errors/Errors.js";
 // // -------- ROUTES
 
 // @desc Get all users
 // @route GET /users
 // @access Private
 export const getAllUsers = async (req: Request, res: Response) => {
-    const users = await dbGetAllUsers()
+  const users = await dbGetAllUsers();
 
-    return res.status(200).json(users)
-}
+  return res.status(200).json(users);
+};
 
 // @desc Get user by id
 // @route GET /users/:id
 // @access Private
 export const getUserById = async (req: Request, res: Response) => {
-    const userId = parseUserId(req.params.id)
+  const userId = parseUserId(req.params.id);
 
-    const user = await dbGetUserById(userId)
+  const { id: updaterId } = getUserIdentity(req);
 
-    return res.status(200).json(user)
-}
+  if (updaterId !== userId) throw new ForbiddenError();
+
+  const user = await dbGetUserById(userId);
+
+  return res.status(200).json(user);
+};
 
 // @desc Update user email or username
 // @route PATCH /users/:id
 // @access Private
-// FIX SOMETHING *************
 export const updateUserField = async (req: Request, res: Response) => {
-    const id = parseUserId(req.params.id)
+  const userId = parseUserId(req.params.id);
 
-    const { method: field, data: newValue } = parseUserUpdateAttempt(req.body)
+  const { id: updaterId } = getUserIdentity(req);
 
-    await dbUpdateUserByField(field, newValue, id)
+  if (updaterId !== userId) throw new ForbiddenError();
 
-    return res.status(200)
-}
+  const { method: field, data: newValue } = parseUserUpdateAttempt(req.body);
 
-// @desc Update user password
-// @route PATCH /users/:id/password
-// @access Private
-export const updateUserPassword = async (req: Request, res: Response) => {
-    const id = parseUserId(req.params.id)
+  await dbUpdateUserByField(field, newValue, userId);
 
-    const { oldPass, newPass } = parseUserResetAttempt(req.body)
-
-    const { sessionToken } = await dbUpdateUserPassword(id, oldPass, newPass)
-
-    return res.status(200).json({ sessionToken })
-}
+  return res
+    .status(200)
+    .json({ success: true, message: `User ${field} updated successfully` });
+};
 
 // @desc Delete user
 // @route DELETE /users/:id
 // @access Private
-export const deleteNote = async (req: Request, res: Response) => {
-    const id = parseUserId(req.params.id)
+export const deleteUser = async (req: Request, res: Response) => {
+  const { id } = getUserIdentity(req);
 
-    const result = await dbDeleteUser(id)
+  const { password } = parseUserDeleteAttempt(req.body);
 
-    return res.sendStatus(204).json(result)
-}
+  const result = await dbDeleteUser(id, password);
+
+  return res.clearCookie(cookieNames.user_cookie_name).status(204).json(result);
+};
