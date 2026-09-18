@@ -20,7 +20,7 @@ import { getUserIdentity } from "./parsers/authRequestParsers.js";
 // Util
 export const shortCookieArgs = (
   sT: string,
-  minutes: number = 5,
+  minutes: number = 1440,
 ): [string, string, CookieOptions] => {
   return [
     USER_SESSION_COOKIE_NAME!,

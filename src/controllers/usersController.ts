@@ -70,5 +70,5 @@ export const deleteUser = async (req: Request, res: Response) => {
 
   const result = await dbDeleteUser(id, password);
 
-  return res.clearCookie(cookieNames.user_cookie_name).status(204).json(result);
+  return res.clearCookie(cookieNames.user_cookie_name).status(200).json(result);
 };

@@ -10,19 +10,20 @@ This project also serves as a foundation for setting up other backend projects w
 
 1. [Overview](#overview)
 2. [Database Structure](#database-structure)
-3. [API Endpoints](#api-endpoints)
-4. [Features](#features)
-5. [Tech Stack](#tech-stack)
-6. [Folder Structure](#folder-structure)
-7. [Installation](#installation)
-8. [Configuring Environment Variables](#configuring-environment-variables)
-9. [Usage](#usage)
-10. [Middleware](#middleware)
-11. [Error Handling](#error-handling)
-12. [Deployment](#deployment)
-13. [Contributing](#contributing)
-14. [License](#license)
-15. [References](#references)
+3. [Authentication Cookie](#authentication-cookie)
+4. [API Endpoints](#api-endpoints)
+5. [Features](#features)
+6. [Tech Stack](#tech-stack)
+7. [Folder Structure](#folder-structure)
+8. [Installation](#installation)
+9. [Configuring Environment Variables](#configuring-environment-variables)
+10. [Usage](#usage)
+11. [Middleware](#middleware)
+12. [Error Handling](#error-handling)
+13. [Deployment](#deployment)
+14. [Contributing](#contributing)
+15. [License](#license)
+16. [References](#references)
 
 ---
 
@@ -43,23 +44,23 @@ Authenticated requests are associated with a user through session-based authenti
 
 ### Entity: `Note`
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `id` | string | Unique identifier for the note |
-| `userId` | string | Identifier of the user who owns the note |
-| `title` | string | Title of the note |
-| `content` | string | Main body of the note |
-| `createdAt` | timestamp | Time at which the note was created |
-| `updatedAt` | timestamp | Time at which the note was last updated |
+| Field       | Type      | Description                              |
+| ----------- | --------- | ---------------------------------------- |
+| `id`        | string    | Unique identifier for the note           |
+| `userId`    | string    | Identifier of the user who owns the note |
+| `title`     | string    | Title of the note                        |
+| `content`   | string    | Main body of the note                    |
+| `createdAt` | timestamp | Time at which the note was created       |
+| `updatedAt` | timestamp | Time at which the note was last updated  |
 
 ### Entity: `User`
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `username` | string | Unique username associated with the account |
-| `email` | string | Email address associated with the account |
-| `auth.password` | string | Password-related authentication data |
-| `auth.sessionToken` | string | Token used for session authentication |
+| Field               | Type   | Description                                 |
+| ------------------- | ------ | ------------------------------------------- |
+| `username`          | string | Unique username associated with the account |
+| `email`             | string | Email address associated with the account   |
+| `auth.password`     | string | Password-related authentication data        |
+| `auth.sessionToken` | string | Token used for session authentication       |
 
 The `auth` field groups authentication-related information:
 
@@ -71,38 +72,105 @@ auth
 
 ---
 
+### Authentication Cookie
+
+Authenticated sessions use an HTTP cookie named `user-auth`.
+
+| Property       | Value                                                        |
+| -------------- | ------------------------------------------------------------ |
+| Name           | `user-auth`                                                  |
+| Type           | Session token                                                |
+| `HttpOnly`     | `true`                                                       |
+| `Secure`       | `true` in production                                         |
+| `SameSite`     | `Strict`                                                     |
+| Path           | `/`                                                          |
+| Lifetime       | 5 minutes                                                    |
+| Sent by client | Automatically with authenticated requests                    |
+| Refresh        | `/auth/refresh` issues a new session token                   |
+| Logout         | `/auth/logout` clears the cookie and invalidates the session |
+
+The client does not need to include the session token in the request body or headers. The browser sends the cookie automatically with requests.
+
+---
+
 ## API Endpoints
 
 ### Authentication — `/auth`
 
-| Method | Route | Description |
-| --- | --- | --- |
-| `POST` | `/auth/register` | Register a new account |
-| `POST` | `/auth/login` | Authenticate a user and establish a session |
-| `POST` | `/auth/refresh` | Refresh the current session token |
-| `POST` | `/auth/logout` | Log out the current user and invalidate the session |
-| `POST` | `/auth/update-password` | Update the authenticated user's password |
+| Method | Route                   | Authentication | Request Body                                            | Response                                                                      | Status |
+| ------ | ----------------------- | -------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------- | -----: |
+| `POST` | `/auth/register`        | Not required   | `{ username: string; email: string; password: string }` | `{ username: string; email: string; userId: string }` + `sessionToken` cookie |  `201` |
+| `POST` | `/auth/login`           | Not required   | `{ identifier: string; password: string }`              | `sessionToken` cookie only                                                    |  `204` |
+| `POST` | `/auth/refresh`         | Required       | No body; `sessionToken` cookie                          | New `sessionToken` cookie                                                     |  `204` |
+| `POST` | `/auth/update-password` | Required       | `{ oldPass: string; newPass: string }`                  | New/updated `sessionToken` cookie                                             |  `204` |
+| `POST` | `/auth/logout`          | Required       | `sessionToken` cookie                                   | Clears `sessionToken` cookie                                                  |  `204` |
+
+**Validation:** Request fields are validated using Zod schemas (`ZodString`, `ZodEmail`, etc.).
 
 ### Users — `/users`
 
-| Method | Route | Authentication | Description |
-| --- | --- | --- | --- |
-| `GET` | `/users` | Not required | Retrieve all users |
-| `GET` | `/users/:id` | Required | Retrieve a user by ID |
-| `PATCH` | `/users/:id` | Required | Update a user's username or email |
-| `DELETE` | `/users/:id` | Required | Delete an account |
+All user routes require authentication.
+
+**Default User Output:**
+
+```ts
+{
+  username: string;
+  email: string;
+  id: string;
+  createdAt: FirebaseFirestore.Timestamp;
+  updatedAt: FirebaseFirestore.Timestamp;
+}
+```
+
+| Method   | Route        | Authentication | Request                                                                   | Response                                          | Status |
+| -------- | ------------ | -------------- | ------------------------------------------------------------------------- | ------------------------------------------------- | -----: |
+| `GET`    | `/users`     | Required       | Query: `startDocId?: string`, `limit?: number`, `order?: "asc" \| "desc"` | `User[]`                                          |  `200` |
+| `GET`    | `/users/:id` | Required       | `id` in URL params                                                        | `User`                                            |  `200` |
+| `PATCH`  | `/users/:id` | Required       | `id` in params; `{ email: string }` **or** `{ username: string }`         | `{ success: true; message: string }`              |  `200` |
+| `DELETE` | `/users/:id` | Required       | `id` in params; `{ password: string }`                                    | Clears `sessionToken` cookie; `{ success: true }` |  `200` |
+
+**Pagination Query:**
+
+```ts
+{
+  startDocId?: string;
+  limit?: number;
+  order?: "asc" | "desc";
+}
+```
 
 ### Notes — `/notes`
 
 All note routes require authentication. Notes are associated with the authenticated user.
 
-| Method | Route | Description |
-| --- | --- | --- |
-| `GET` | `/notes` | Retrieve all notes belonging to the authenticated user |
-| `POST` | `/notes` | Create a new note |
-| `GET` | `/notes/:id` | Retrieve a specific note belonging to the user |
-| `PATCH` | `/notes/:id` | Update a specific note |
-| `DELETE` | `/notes/:id` | Delete a specific note |
+**Note:**
+
+```ts
+{
+  title: string;
+  content: string;
+  userId: string;
+}
+```
+
+| Method   | Route        | Authentication | Request                                                                   | Response | Status |
+| -------- | ------------ | -------------- | ------------------------------------------------------------------------- | -------- | -----: |
+| `GET`    | `/notes`     | Required       | Query: `startDocId?: string`, `limit?: number`, `order?: "asc" \| "desc"` | `Note[]` |  `200` |
+| `POST`   | `/notes`     | Required       | `{ title: string; content: string }`                                      | `Note`   |  `201` |
+| `GET`    | `/notes/:id` | Required       | `id` in URL params                                                        | `Note`   |  `200` |
+| `PATCH`  | `/notes/:id` | Required       | `id` in URL params                                                        | `Note`   |  `200` |
+| `DELETE` | `/notes/:id` | Required       | `id` in URL params                                                        | Nothing  |  `204` |
+
+**Pagination Query:**
+
+```ts
+{
+  startDocId?: string;
+  limit?: number;
+  order?: "asc" | "desc";
+}
+```
 
 ---
 
@@ -290,15 +358,15 @@ Errors are returned using a structured format:
 
 The primary application errors include:
 
-| Error | Code | Meaning |
-| --- | ---: | --- |
-| `BadRequestError` | 400 | The request contains invalid parameters, query data, or body data |
-| `ValidationError` | 400 | The supplied data does not satisfy the required schema |
-| `AuthenticationError` | 401 | Authentication failed, such as when an incorrect password is supplied |
-| `ForbiddenError` | 403 | The authenticated user is not authorized to access the requested resource |
-| `DocumentNotFoundError` | 404 | A document with the specified identifier does not exist |
-| `ConflictError` | 409 | A request conflicts with an existing resource, such as attempting to use an already-existing username |
-| `InternalServerError` | 500 | An unexpected internal error occurred, such as a failure to connect to Firestore |
+| Error                   | Code | Meaning                                                                                               |
+| ----------------------- | ---: | ----------------------------------------------------------------------------------------------------- |
+| `BadRequestError`       |  400 | The request contains invalid parameters, query data, or body data                                     |
+| `ValidationError`       |  400 | The supplied data does not satisfy the required schema                                                |
+| `AuthenticationError`   |  401 | Authentication failed, such as when an incorrect password is supplied                                 |
+| `ForbiddenError`        |  403 | The authenticated user is not authorized to access the requested resource                             |
+| `DocumentNotFoundError` |  404 | A document with the specified identifier does not exist                                               |
+| `ConflictError`         |  409 | A request conflicts with an existing resource, such as attempting to use an already-existing username |
+| `InternalServerError`   |  500 | An unexpected internal error occurred, such as a failure to connect to Firestore                      |
 
 ---
 
